@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.application' version '8.13.2'
+}
+
+android {
+    namespace 'app.seans.cinema'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'app.seans.cinema'
+        if (providers.gradleProperty('parallelInstall').isPresent()) {
+            applicationIdSuffix '.home'
+        }
+        resValue 'string', 'app_name', providers.gradleProperty('parallelInstall').isPresent() ? 'Сеанс Кино' : 'Сеанс'
+        minSdk 26
+        targetSdk 35
+        versionCode 8
+        versionName '1.7'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'org.jsoup:jsoup:1.18.3'
+    implementation 'androidx.media3:media3-exoplayer:1.5.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.5.1'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.5.1'
+    implementation 'androidx.media3:media3-ui:1.5.1'
+}

@@ -1,0 +1,10 @@
+<resources>
+    <color name="cinema_accent">#EED09D</color>
+    <style name="CinemaTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorAccent">@color/cinema_accent</item>
+        <item name="android:alertDialogTheme">@style/CinemaDialog</item>
+    </style>
+    <style name="CinemaDialog" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">@color/cinema_accent</item>
+    </style>
+</resources>
