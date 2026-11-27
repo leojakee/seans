@@ -2,6 +2,13 @@ plugins {
     id 'com.android.application' version '8.13.2'
 }
 
+// Release signing: keystore.properties in the project root (git-ignored) or the SEANS_* environment
+// variables in CI. Without them release builds stay unsigned and debug builds use the debug key.
+def signing = new Properties()
+def signingFile = rootProject.file('keystore.properties')
+if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+def signingValue = { String key, String env -> signing.getProperty(key) ?: System.getenv(env) }
+
 android {
     namespace 'app.seans.cinema'
     compileSdk 35
@@ -15,6 +22,22 @@ android {
         targetSdk 35
         versionCode 9
         versionName '1.8'
+    }
+    signingConfigs {
+        release {
+            def store = signingValue('storeFile', 'SEANS_KEYSTORE')
+            if (store) {
+                storeFile file(store)
+                storePassword signingValue('storePassword', 'SEANS_KEYSTORE_PASSWORD')
+                keyAlias signingValue('keyAlias', 'SEANS_KEY_ALIAS') ?: 'seans'
+                keyPassword signingValue('keyPassword', 'SEANS_KEY_PASSWORD') ?: signingValue('storePassword', 'SEANS_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (signingValue('storeFile', 'SEANS_KEYSTORE')) signingConfig signingConfigs.release
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

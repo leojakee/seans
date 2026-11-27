@@ -1,0 +1,40 @@
+# Builds a signed APK for every version tag (v1.9, v1.9.1, ...) and attaches it to a GitHub release.
+# The app's "Обновления" screen reads the latest release of this repository.
+# Repository secrets: SEANS_KEYSTORE_BASE64 (the .jks file in base64), SEANS_KEYSTORE_PASSWORD.
+name: Release APK
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Version in the tag matches the app
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          app=$(grep -oP "versionName '\K[^']+" app/build.gradle)
+          if [ "$tag" != "$app" ]; then echo "Tag $tag differs from versionName $app"; exit 1; fi
+      - name: Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SEANS_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/seans-release.jks"
+      - name: Build
+        env:
+          SEANS_KEYSTORE: ${{ runner.temp }}/seans-release.jks
+          SEANS_KEYSTORE_PASSWORD: ${{ secrets.SEANS_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew -PparallelInstall :app:assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "seans-${GITHUB_REF_NAME#v}.apk"
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "seans-${GITHUB_REF_NAME#v}.apk" --title "Сеанс ${GITHUB_REF_NAME#v}" --generate-notes
