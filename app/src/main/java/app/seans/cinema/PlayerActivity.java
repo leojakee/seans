@@ -417,6 +417,8 @@ public class PlayerActivity extends Activity {
         resolution.setOnClickListener(v->nativeQuality(true));
         Button audio=button("Озвучка");tools.addView(audio,tools.getChildCount()-1);
         audio.setOnClickListener(v->AudioMenu.nativeTracks(this,player));
+        Button skip=button("+85 с");tools.addView(skip,tools.getChildCount()-1);
+        skip.setOnClickListener(v->{if(player!=null)player.seekTo(Math.min(player.getCurrentPosition()+85000,Math.max(0,player.getDuration()-1000)));});
         playerView.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener) visibility-> tools.setVisibility(visibility));
         DefaultHttpDataSource.Factory http=new DefaultHttpDataSource.Factory().setUserAgent(headers.getOrDefault("User-Agent",Catalog.UA))
                 .setDefaultRequestProperties(headers).setConnectTimeoutMs(12000).setReadTimeoutMs(18000);
@@ -435,7 +437,10 @@ public class PlayerActivity extends Activity {
                 if(state==Player.STATE_READY && gate && !qualityRequested){
                     qualityRequested=true;nativeQuality(false);
                 }
-                if (state==Player.STATE_ENDED) { completed=true; seek=0; record(); playerView.showController(); }
+                if (state==Player.STATE_ENDED) {
+                    completed=true; seek=0; record();
+                    if (detail.optBoolean("seriesChoice")) nextEpisodeCountdown(); else playerView.showController();
+                }
             }
             @Override public void onIsPlayingChanged(boolean playing){
                 if(playing && !started){started=true;save.run();}
@@ -471,6 +476,28 @@ public class PlayerActivity extends Activity {
                 if(foreground)target.play();else resumePlay=true;
             }
         },()->{if(!manual)finish();});
+    }
+    // At the end of an episode: count down 10 seconds, then hand over to the catalogue to start the next one.
+    private void nextEpisodeCountdown() {
+        android.widget.LinearLayout box=new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);box.setPadding(dp(24),dp(18),dp(24),dp(18));
+        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xEE1D1F20);bg.setCornerRadius(dp(18));box.setBackground(bg);
+        TextView text=new TextView(this);text.setTextColor(0xFFFFFFFF);text.setTextSize(20);box.addView(text);
+        android.widget.LinearLayout row=new android.widget.LinearLayout(this);row.setPadding(0,dp(14),0,0);
+        Button now=button("Смотреть сейчас"), stop=button("Отмена");row.addView(now);row.addView(stop);box.addView(row);
+        screen.addView(box,new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.END){{setMargins(0,0,dp(32),dp(48));}});
+        final int[] left={10};
+        Runnable[] tick=new Runnable[1];
+        Runnable go=()->{setResult(RESULT_OK,new Intent().putExtra("nextEpisode",true));finish();};
+        tick[0]=()->{
+            if(isFinishing())return;
+            if(left[0]<=0){go.run();return;}
+            text.setText("Следующая серия через "+left[0]+" с");left[0]--;ui.postDelayed(tick[0],1000);
+        };
+        now.setOnClickListener(v->{ui.removeCallbacks(tick[0]);go.run();});
+        stop.setOnClickListener(v->{ui.removeCallbacks(tick[0]);screen.removeView(box);playerView.showController();});
+        tick[0].run();now.requestFocus();
     }
     private void record() {
         if (player!=null && started) {

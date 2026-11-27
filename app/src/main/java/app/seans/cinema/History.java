@@ -6,8 +6,13 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 final class History {
+    /** History of the active profile: "library" for the first one, "library-<id>" for the others. */
+    static android.content.SharedPreferences prefs(Context context) {
+        String profile = context.getSharedPreferences("settings",0).getString("profile","main");
+        return context.getSharedPreferences("main".equals(profile) ? "library" : "library-" + profile,0);
+    }
     static JSONArray all(Context context) {
-        try { return new JSONArray(context.getSharedPreferences("library",0).getString("history","[]")); }
+        try { return new JSONArray(prefs(context).getString("history","[]")); }
         catch (JSONException e) { return new JSONArray(); }
     }
     static long position(Context context,String page) {
@@ -36,10 +41,10 @@ final class History {
             JSONObject row=old.optJSONObject(i);
             if (row != null && !page.equals(row.optString("page"))) rows.put(row);
         }
-        context.getSharedPreferences("library",0).edit().putString("history",rows.toString()).apply();
+        prefs(context).edit().putString("history",rows.toString()).apply();
     }
     static void clear(Context context) {
-        context.getSharedPreferences("library",0).edit().remove("history").apply();
+        prefs(context).edit().remove("history").apply();
     }
     static void save(Context context,JSONObject item,String page,String title,long position,long duration,boolean finished) {
         try {
@@ -50,7 +55,8 @@ final class History {
                 JSONObject row=old.getJSONObject(i);
                 if (!page.equals(row.optString("page"))) rows.put(row);
             }
-            context.getSharedPreferences("library",0).edit().putString("history",rows.toString()).apply();
+            prefs(context).edit().putString("history",rows.toString()).apply();
+            WatchNext.update(context,item,page,title,position,duration,finished);
         } catch (JSONException ignored) { }
     }
 }
