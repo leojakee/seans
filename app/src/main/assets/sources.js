@@ -152,7 +152,7 @@ function otherSites(external=false,reason=''){
     const hint=ctx?{season:ctx.season,episode:ctx.episode}:
         {season:partNumber(seasons.find(s=>s.url===sectionPage)),episode:partNumber(episodes.find(e=>e.url===activeEpisode))};
     const suggested=ctx && sourcePreferences(ctx).suggestion;
-    beginDialog('other-sites',ctx?'Выберите источник':item.title);
+    beginDialog('other-sites',ctx?'Выберите озвучку':item.title);
     const list=el('div'),status=el('p','note section'),done=btn('Закрыть',closeDialog,'subtle');
     const players=el('div'), torrents=btn('Найти раздачи в JacRed',()=>torrentDialog(item,releaseYear,hint),'option');
     if(ctx){
