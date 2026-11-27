@@ -113,6 +113,7 @@ async function showHome() {
     if(token!==version)return;
     root.replaceChildren();
     if(category==='Все'){showShelves(token);return;}
+    if(['Каталог','Фильмы','Сериалы'].includes(category)){showFeed(category,token);return;}
     const data=section || home;
     const kind=category==='Фильмы'?'Фильм':category==='Сериалы'?'Сериал':'';
     const items=section || category==='Каталог' ? data.items : home.items.filter(i=>i.kind===kind);
@@ -129,20 +130,9 @@ function settleFocus(){
 }
 function showShelves(token){
     const continued=viewings.filter(h=>!h.finished).slice(0,16);
-    if(continued.length)root.append(shelf('Продолжить просмотр',continueGrid(continued)));
+    if(continued.length)root.append(shelf('Досмотреть',continueGrid(continued)));
     root.append(shelf('Новое в каталоге',grid(home.items.slice(0,20)),'Каталог'));
-    for(const name of ['Фильмы','Сериалы']){
-        const kind=name==='Фильмы'?'Фильм':'Сериал';
-        const local=home.items.filter(i=>i.kind===kind).slice(0,20);
-        const block=shelf(name,grid(local),name);root.append(block);
-        if(home.categories[name])categoryData(name).then(data=>{
-            if(token!==version || !block.isConnected || !data.items.length)return;
-            const had=block.contains(document.activeElement);
-            const row=grid(data.items.slice(0,20));row.classList.add('row');block.querySelector('.grid').replaceWith(row);
-            if(had)focus(row.querySelector('.card'));
-        }).catch(()=>{});
-        if(!local.length && !home.categories[name])block.remove();
-    }
+    root.append(feedShelf('Фильмы','Фильмы со всех источников'),feedShelf('Сериалы','Сериалы со всех источников'));
     if(favorites.length)root.append(shelf('Избранное',grid(favorites.slice(0,16))));
     settleFocus();
 }

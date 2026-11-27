@@ -53,6 +53,11 @@ customElements.define('seans-region',MaterialRegion);
 function region(view,className){
     const host=document.createElement('seans-region');host.view=view;host.className=className;return host;
 }
+// Re-render a region with new content; React keeps the existing cards, so focus and scroll stay put.
+function updateRegion(host,view){
+    host.view=view;
+    if(host.reactRoot)flushSync(()=>host.reactRoot.render(themed(view)));
+}
 
 // Sections of the bottom bar (phone) and of the side menu (both modes); opened through window.openSection.
 const sections=[['home','Главная',HomeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon]];
@@ -113,13 +118,14 @@ function ModeOptions({choose}){
             <span><strong>{label}</strong><small>{hint}</small></span>
         </Button>);
 }
-function SettingsChoices({tv,maximum,sites,changeMode,changeSites,setMaximum}){
+function SettingsChoices({tv,maximum,sites,changeMode,changeSites,setMaximum,tiles,changeTiles}){
     const [enabled,setEnabled]=useState(maximum);
     return <>
         <Button variant="outlined" startIcon={tv?<TvIcon/>:<PhoneIcon/>} onClick={changeMode}>Режим · {tv?'Телевизор':'Телефон'}</Button>
         <FormControlLabel className="quality-switch" labelPlacement="start" label="Всегда максимальное качество"
             control={<Switch checked={enabled} onChange={(_,value)=>{setMaximum(value);setEnabled(value);}}/>}/>
         <Button variant="outlined" onClick={changeSites}>Источники поиска · {sites}</Button>
+        <Button variant="outlined" startIcon={<ListIcon/>} onClick={changeTiles}>Плитки · {tiles}</Button>
     </>;
 }
 function EntryField({tv,htmlInput,...props}){
@@ -169,6 +175,7 @@ function SearchForm({tv,draft,initial,open,fields,onDraft,onSubmit,onToggle,onCh
 window.SeansUI={
     selectTab, menu:open=>drawChrome({menuOpen:open}),
     grid:entries=>region(<PosterGrid entries={entries}/>,'grid'),
+    updateGrid:(host,entries)=>updateRegion(host,<PosterGrid entries={entries}/>),
     modes:choose=>region(<ModeOptions choose={choose}/>,'mui-modes'),
     playActions:(label,external,play)=>region(<>
         <Button variant="contained" className="primary" startIcon={<PlayIcon/>} onClick={()=>play(false)}>{label}</Button>
