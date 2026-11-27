@@ -115,9 +115,11 @@ function feedShelf(category,title){
     const feed=feedFor(category);
     const host=SeansUI.grid([]);
     const block=shelf(title,host,category);
-    let shown=0;
+    let shown=0, attached=false;
     function render(){
-        if(!host.isConnected){feed.listeners.delete(render);return;}
+        // Sites can answer before the shelf is on the page: only a shelf that was shown and then removed stops listening.
+        if(!host.isConnected){if(attached)feed.listeners.delete(render);return;}
+        attached=true;
         const groups=feedGroups(feed).slice(0,24);
         if(groups.length!==shown){shown=groups.length;SeansUI.updateGrid(host,feedEntries(groups));settleFocus();}
         block.hidden=!groups.length;

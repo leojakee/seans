@@ -24,6 +24,7 @@ import MenuIcon from '@mui/icons-material/MenuRounded';
 import HomeIcon from '@mui/icons-material/HomeOutlined';
 import SeriesIcon from '@mui/icons-material/LiveTvOutlined';
 import ListIcon from '@mui/icons-material/ViewModuleOutlined';
+import ResumeIcon from '@mui/icons-material/HistoryRounded';
 
 const cache=createCache({key:'seans',nonce:document.querySelector('meta[name=style-nonce]').content,prepend:true});
 const theme=createTheme({
@@ -62,7 +63,18 @@ function updateRegion(host,view){
 // Sections of the bottom bar (phone) and of the side menu (both modes); opened through window.openSection.
 const sections=[['home','Главная',HomeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon]];
 const menu=[['home','Главная',HomeIcon],['catalog','Каталог',ListIcon],['movies','Фильмы',MovieIcon],['series','Сериалы',SeriesIcon],
-    ['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon],['settings','Настройки',SettingsIcon]];
+    ['continue','Досмотреть',ResumeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon],['settings','Настройки',SettingsIcon]];
+// The logo: a ticket-shaped play button and the name beside it.
+function Logo(){
+    return <div className="brand" aria-label="Сеанс">
+        <svg className="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <defs><linearGradient id="logoFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe45c"/><stop offset="1" stopColor="#ffb020"/></linearGradient></defs>
+            <path fill="url(#logoFill)" d="M8 3h16a5 5 0 0 1 5 5v5a3 3 0 0 0 0 6v5a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5v-5a3 3 0 0 0 0-6V8a5 5 0 0 1 5-5z"/>
+            <path fill="#17191a" d="M13 10.5v11a1 1 0 0 0 1.5.86l9-5.5a1 1 0 0 0 0-1.72l-9-5.5A1 1 0 0 0 13 10.5z"/>
+        </svg>
+        <span className="logo-text">Сеанс</span>
+    </div>;
+}
 function Clock(){
     const [now,setNow]=useState(new Date());
     useEffect(()=>{const t=setInterval(()=>setNow(new Date()),15000);return ()=>clearInterval(t);},[]);
@@ -72,8 +84,9 @@ function Clock(){
 function Chrome({active,section,title,menuOpen}){
     return <>
         <header className="topbar">
-            <IconButton id="menu-toggle" aria-label="Меню" aria-expanded={menuOpen} onClick={()=>window.toggleMenu()}><MenuIcon/></IconButton>
-            <div className="brand"><i className="mark" aria-hidden="true"/>Сеанс</div>
+            <Button id="menu-toggle" className="menu-button" aria-label="Меню" aria-expanded={menuOpen} startIcon={<MenuIcon/>}
+                onClick={()=>window.toggleMenu()}><span className="menu-label">Меню</span></Button>
+            <Logo/>
             {title && <span className="topbar-title">{title}</span>}
             <span className="spacer"/>
             <IconButton aria-label="Поиск" data-top="search" onClick={()=>window.openSection('search')}><SearchIcon/></IconButton>
@@ -83,7 +96,9 @@ function Chrome({active,section,title,menuOpen}){
         <nav id="tabs" aria-label="Разделы">{sections.map(([id,label,Icon])=>
             <Button key={id} data-tab={id} className={active===id?'on':''} aria-current={active===id?'page':undefined}
                 startIcon={<Icon/>} onClick={()=>window.openSection(id)}>{label}</Button>)}</nav>
+        <div id="menu-scrim" className={menuOpen?'open':''} onClick={()=>window.closeMenu()} aria-hidden="true"/>
         <aside id="sidemenu" className={menuOpen?'open':''} aria-hidden={!menuOpen} inert={!menuOpen}>
+            <div className="menu-head"><Logo/></div>
             {menu.map(([id,label,Icon])=><Button key={id} data-menu={id} className={section===id?'on':''} startIcon={<Icon/>}
                 onClick={()=>window.openSection(id)}>{label}</Button>)}
         </aside>

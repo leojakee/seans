@@ -81,6 +81,7 @@ function settings() {
     beginDialog('settings','Настройки');
     modal.append(SeansUI.settings({tv:mode==='tv',maximum:Cinema.maximumQuality(),sites:searchSites().length,
         changeMode:()=>modePicker(false),changeSites:manageSearchSites,setMaximum:value=>Cinema.setMaximumQuality(value),tiles:tileLabel(),changeTiles:()=>tilesDialog()}),
+        btn('Обновления'+(updateInfo && updateInfo.newer?' · доступна '+updateInfo.latest:''),updateDialog,'secondary section'),
         el('h3','section','Основной каталог'));
     const input=el('input','address');input.type='url';input.setAttribute('aria-label','Адрес зеркала');input.value=mirror;
     const info=el('p','note');
