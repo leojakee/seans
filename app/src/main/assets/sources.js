@@ -53,7 +53,7 @@ function switchSite(data) {
 }
 function selectSite(data) {
     switchSite(data);results=null;query='';searchDraft='';detailCache.clear();
-    searchFilters.site='';closeDialog();navigate('home');focus(document.querySelector('[data-tab=home]'));
+    searchFilters.site='';closeDialog();navigate('home');focus(entry());
 }
 async function catalogWithFallback(token) {
     const preferred=mirror;

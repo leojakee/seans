@@ -77,112 +77,145 @@ main{padding-top:22px;padding-bottom:52px;min-height:70vh}h1,h2,h3,p{margin:0}h1
 .mui-parts .MuiChip-root{min-height:40px;font-size:14px}
 .tv .mui-parts .MuiChip-root{min-height:44px;font-size:17px}
 
-/* ===== 1.8 redesign: shelves, poster cards, remote-control focus, phone bottom navigation ===== */
-:root{--bg:#0c0d0d;--panel:#17191a;--panel-2:#222526;--line:#ffffff14;--ink:#f5f2ea;--muted:#aab0a8;--gold:#f0cf94}
-body{background:var(--bg)}
-#chrome header{background:var(--bg)}
-h1{font-size:clamp(30px,4.6vw,54px)}
-h2{font-size:24px}
+/* ===== 1.8: media-centre layout — top bar, side menu, shelves, badge posters, title page ===== */
+:root{--bg:#1d1f20;--panel:#26292b;--panel-2:#2f3335;--line:#ffffff12;--ink:#ffffff;--muted:#a9adb1;--gold:#ffffff;--badge:#ffe216;--tv:#e0161f;--space:clamp(14px,3.4vw,40px)}
+body{background:var(--bg);color:var(--ink);font-family:Roboto,Arial,sans-serif}
+h1,h2,.modal h2{font-family:Roboto,Arial,sans-serif;font-weight:700;letter-spacing:-.3px}
+h1{font-size:clamp(26px,4vw,40px)}h2{font-size:22px}
+.tv{font-size:18px}
+.tv :focus{scroll-margin:48px}
 
-/* Buttons share one size and shape across custom and Material controls. */
-.chip,.secondary,.subtle,.primary{min-height:44px;padding:10px 18px;border-radius:12px;font-size:15px;line-height:1.2;transition:background .15s,color .15s,transform .15s}
-.secondary,.chip{background:var(--panel-2);color:#dcdfd6}.chip.active{background:#3a3f37;color:var(--ink)}
-.primary{background:var(--gold);color:#1d1a12;font-weight:700}
-.mui-play-actions .MuiButton-root{min-height:44px;padding:10px 20px;border-radius:12px;font-size:15px}
-.mui-parts .MuiChip-root{border-radius:12px}
-.subtle{background:none;padding-inline:8px}
+/* Top bar */
+#chrome{position:sticky;top:0;z-index:6;background:linear-gradient(var(--bg) 70%,#1d1f2000)}
+.topbar{display:flex;align-items:center;gap:6px;height:56px;padding-inline:calc(var(--space) - 8px);border:0}
+.topbar .MuiIconButton-root{color:#fff;width:42px;height:42px}
+.topbar .brand{font:700 22px/1 Georgia,serif;letter-spacing:-1px;margin:0 8px 0 4px;gap:8px}
+.topbar .mark{width:18px;height:18px;background:linear-gradient(#fff,#fff) 0 0/100% 3px,linear-gradient(#fff,#fff) 0 5px/78% 3px,linear-gradient(#fff,#fff) 0 10px/55% 3px,linear-gradient(#fff,#fff) 0 15px/32% 3px;background-repeat:no-repeat}
+.topbar-title{color:var(--muted);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:1px solid #ffffff26;padding-left:12px}
+.topbar .spacer{flex:1}
+.clock{display:flex;align-items:center;gap:8px;margin-left:10px;padding-left:12px;border-left:1px solid #ffffff26}
+.clock strong{font-size:24px;font-weight:600}.clock small{font-size:10px;line-height:1.2;color:var(--muted)}
+.tv .topbar{height:60px}
+.tv #tabs{display:none}
 
-/* Poster cards: image first, text below, no vertical centring inside the button. */
-.grid .card.MuiCardActionArea-root{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;background:none;border-radius:14px;overflow:visible}
+/* Side menu */
+.topbar .mark{display:none}
+main{transition:opacity .2s}
+body.menu-open main,body.menu-open #tabs{opacity:.3}
+#sidemenu{position:fixed;z-index:9;top:0;bottom:0;left:0;width:270px;padding:72px 14px 20px;display:flex;flex-direction:column;gap:4px;
+    background:#1d1f20f7;transform:translateX(-105%);transition:transform .2s ease;overflow:auto}
+#sidemenu.open{transform:none;box-shadow:12px 0 40px #000a}
+#sidemenu .MuiButton-root{justify-content:flex-start;min-height:46px;padding:8px 16px;border-radius:12px;color:#d6d9dc;font-size:16px;font-weight:500}
+#sidemenu .MuiButton-startIcon{margin-right:16px}
+#sidemenu .MuiButton-root.on{color:#fff;background:#ffffff14}
+#sidemenu .MuiButton-root:focus,#sidemenu .MuiButton-root:focus-visible{background:#fff;color:#111;outline:none}
+.tv #sidemenu .MuiButton-root{font-size:19px;min-height:52px}
+
+/* Focus: white, as on TV media centres */
+button:focus-visible,input:focus-visible,select:focus-visible,.tv :focus{outline:3px solid #fff;outline-offset:2px}
+#chrome .MuiButtonBase-root:focus-visible,.tv .MuiButtonBase-root:focus,.mui-search .MuiButtonBase-root:focus-visible{outline:3px solid #fff;outline-offset:2px}
+
+/* Buttons: translucent pills, white primary */
+.chip,.secondary,.subtle,.primary,.mui-play-actions .MuiButton-root{min-height:44px;padding:10px 20px;border-radius:999px;font-size:15px;font-weight:600;line-height:1.2;
+    transition:background .15s,color .15s,transform .15s}
+.secondary,.chip{background:#ffffff14;color:#fff}.chip.active{background:#ffffff30}
+.primary,.mui-play-actions .MuiButton-contained{background:#fff;color:#111;border:0}
+.mui-play-actions .MuiButton-outlined{background:#0000004d;color:#fff;border:0}
+.subtle{background:none;color:#fff;padding-inline:10px}
+.secondary:focus,.chip:focus,.subtle:focus,.mui-play-actions .MuiButton-root:focus{background:#fff;color:#111;outline:none}
+.primary:focus{transform:scale(1.05);box-shadow:0 0 0 3px #ffffff66;outline:none}
+.tv .chip,.tv .primary,.tv .secondary,.tv .subtle,.tv .mui-play-actions .MuiButton-root{min-height:50px;font-size:18px;padding:12px 24px}
+.more-link{min-height:30px;padding:4px 12px;border-radius:999px;background:#ffffff14;font-size:12px;font-weight:600;color:#ddd}
+.more-link:focus{background:#fff;color:#111;outline:none}
+.mui-parts .MuiChip-root{border-radius:999px;background:#ffffff14;color:#fff}
+.mui-parts .MuiChip-colorPrimary{background:#fff;color:#111}
+.tv .mui-parts .MuiChip-root:focus{outline:3px solid #fff;outline-offset:2px}
+
+/* Posters */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:22px 14px}
+.grid .card.MuiCardActionArea-root{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;background:none;border-radius:12px;overflow:visible}
 .card .MuiCardActionArea-focusHighlight{display:none}
-.grid .art{display:block;position:relative;border-radius:14px;overflow:hidden;background:linear-gradient(150deg,#2c312d,#15181a);box-shadow:0 6px 18px #0007;transition:transform .18s ease,box-shadow .18s ease}
-.grid .art img{position:absolute;inset:0;z-index:1}
-.art-fallback{position:absolute;inset:0;display:grid;place-items:center;font:400 54px/1 Georgia,serif;color:#ffffff2e;text-transform:uppercase}
-.score{z-index:2;backdrop-filter:blur(6px)}
+.grid .art{display:block;position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#34383b,#222527);transition:transform .18s ease,box-shadow .18s ease}
+.grid .art img{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover}
+.art-fallback{position:absolute;inset:0;display:grid;place-items:center;font:700 48px/1 Roboto,sans-serif;color:#ffffff26;text-transform:uppercase}
+.tag-tv{position:absolute;z-index:2;top:8px;left:8px;padding:1px 5px;border-radius:4px;background:var(--tv);color:#fff;font:700 10px/1.4 Roboto,sans-serif}
+.score{position:absolute;z-index:2;top:auto;left:auto;right:8px;bottom:6px;background:none;padding:0;font:700 16px/1 Roboto,sans-serif;color:#fff;text-shadow:0 1px 6px #000,0 0 2px #000;backdrop-filter:none}
 .progress{position:absolute;z-index:2;left:8px;right:8px;bottom:8px;height:4px;border-radius:2px;background:#ffffff40}
-.progress i{display:block;height:100%;border-radius:2px;background:var(--gold)}
-.grid .card strong{margin:9px 2px 0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
-.grid .card small{margin:3px 2px 0;font-size:12px}
+.progress i{display:block;height:100%;border-radius:2px;background:#fff}
+.grid .card strong{margin:9px 2px 0;font-size:15px;font-weight:500;line-height:1.25;overflow-wrap:anywhere}
+.grid .card small{margin:3px 2px 0;font-size:12px;color:var(--muted)}
+.grid .card:focus{outline:none}
+.grid .card:focus .art,.grid .card.Mui-focusVisible .art{box-shadow:0 0 0 3px #fff;transform:scale(1.04)}
+.tv .grid:not(.row){grid-template-columns:repeat(6,minmax(0,1fr));gap:28px 18px}
+.tv .grid .card strong{font-size:17px}.tv .grid .card small{font-size:14px}
+.tv .grid .card:focus .art{transform:scale(1.07);box-shadow:0 0 0 4px #fff,0 16px 36px #000c}
+.tv .grid .card:focus strong{color:#fff}
 
-/* Horizontal shelves on the home screen. */
-.shelf-block{margin-top:26px}.shelf-title{font:600 20px/1.2 Roboto,Arial,sans-serif;letter-spacing:0;margin-bottom:12px}
-.grid.row{display:grid;grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:calc((100% - 5*14px)/6);gap:14px;overflow-x:auto;overflow-y:hidden;
+/* Shelves */
+main{padding-top:4px}
+.page-title{font-size:28px;margin:10px 0 18px}
+.shelf-block{margin:10px 0 26px}
+.shelf-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.shelf-title{font:600 20px/1.2 Roboto,Arial,sans-serif;margin:0}
+.grid.row{display:grid;grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:calc((100% - 5*14px)/6.3);gap:14px;overflow-x:auto;overflow-y:hidden;
     padding:10px 8px 12px;margin:-10px -8px 0;scroll-padding-inline:8px;scrollbar-width:none}
 .grid.row::-webkit-scrollbar{display:none}
+.tv .grid.row{grid-auto-columns:calc((100% - 5*18px)/6.4);gap:18px;padding:14px 12px 16px;margin:-14px -12px 0}
+.tv .shelf-title{font-size:23px}
 
-/* Hero and catalogue heading. */
-.hero{min-height:260px;border-radius:18px;margin-bottom:6px}
-.hero:before{background:linear-gradient(0deg,#0c0d0df5 0%,#0c0d0d55 60%,#0c0d0d00 100%),linear-gradient(90deg,#0c0d0dee 0%,#0c0d0d00 70%)}
-.bar{justify-content:flex-start;gap:20px;margin:30px 0 16px}
-
-/* Title page: full-width backdrop with the title and genres on it, actions overlapping its bottom edge. */
-.backdrop{min-height:300px;border-radius:18px;padding:28px 28px 76px;align-items:end}
-.backdrop:after{background:linear-gradient(90deg,#0c0d0df0 0%,#0c0d0dc0 38%,#0c0d0d30 75%),linear-gradient(0deg,#0c0d0d 0%,#0c0d0d00 45%)}
-.backdrop h1{max-width:min(860px,80%);text-wrap:balance}
-.genres{margin-top:10px;color:#e4e0d4;font-size:15px}
-.detailbody{position:relative;z-index:1;margin-top:-60px;padding-inline:28px;max-width:1180px}
-.detailbody .actions{margin-top:0}
-.synopsis{color:#cfd2c9}
-
-/* ---------- Television ---------- */
-.tv{--space:5vw;font-size:19px}
-.tv :focus{scroll-margin:40px}
-.tv h1{font-size:44px}
+/* Title page */
+.title-bg{position:fixed;inset:0;z-index:-1;background:var(--bg);pointer-events:none}
+.title-bg img{width:100%;height:100%;object-fit:cover;object-position:50% 25%;opacity:.42}
+.title-bg:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#1d1f20f2 0%,#1d1f20b0 45%,#1d1f2033 100%),linear-gradient(0deg,#1d1f20 0%,#1d1f2000 55%)}
+.title-head{display:flex;gap:30px;align-items:flex-start;margin:14px 0 6px}
+.title-poster{position:relative;flex:none;width:clamp(120px,18vw,210px);aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:#2a2d2f;box-shadow:0 14px 40px #000b}
+.title-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.title-info{min-width:0;flex:1}
+.title-info .eyeline{color:var(--muted);font-size:14px;font-weight:500;letter-spacing:0;text-transform:none;margin-bottom:6px}
+.title-info h1{font-size:clamp(28px,4.4vw,48px);line-height:1.08;text-wrap:balance}
+.facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.fact{padding:3px 9px;border:1px solid #ffffff40;border-radius:6px;font-size:14px;color:#e8e8e8}
+.fact.rating{border-color:var(--badge);color:var(--badge);font-weight:700}
+.genres{margin-top:12px;color:#cfd2d5;font-size:15px}
+.title-info .actions{margin-top:20px;gap:12px}
+.detailbody{max-width:1100px;margin-top:8px}
+.detailbody .section{margin-top:22px}
+.synopsis{color:#d0d3d6;max-width:80ch;margin-top:8px}
+.edition-note{color:var(--badge)}
+.back{margin:6px 0 0;padding-inline:6px}
 .tv .back{display:none}
-.tv .hero{min-height:clamp(170px,36vh,360px)}
-.tv .hero h1{font-size:50px}
-.tv .grid:not(.row){grid-template-columns:repeat(6,minmax(0,1fr));gap:26px 18px}
-.tv .grid.row{grid-auto-columns:calc((100% - 5*18px)/6);gap:18px;padding:14px 12px 16px;margin:-14px -12px 0}
-.tv .shelf-title{font-size:24px}
-.tv .grid .card.MuiButtonBase-root:focus{outline:none}
-.tv .grid .card:focus .art{transform:scale(1.06);box-shadow:0 0 0 3px var(--gold),0 14px 34px #000c}
-.tv .grid .card:focus strong{color:var(--gold)}
-.tv .grid .card strong{font-size:17px}.tv .grid .card small{font-size:15px}
-.tv .chip,.tv .primary,.tv .secondary,.tv .mui-play-actions .MuiButton-root{min-height:52px;font-size:18px;padding:12px 22px}
-.tv .secondary:focus,.tv .chip:focus{background:var(--ink);color:#111;outline-offset:2px}
-.tv .primary:focus{transform:scale(1.04)}
-.tv .backdrop{min-height:58vh;margin-inline:calc(-1*var(--space));border-radius:0;padding:5vh var(--space) 96px}
-.tv .backdrop h1{font-size:52px;max-width:62%}
-.tv .genres{font-size:18px}
-.tv .detailbody{padding-inline:0;margin-top:-72px}
-.tv .synopsis{max-width:70ch;font-size:19px}
+.tv .title-head{margin-top:18px;gap:36px}
+.tv .title-info h1{font-size:50px}
+.tv .genres,.tv .fact{font-size:17px}
+.tv .synopsis{font-size:19px;max-width:72ch}
 
-/* ---------- Phone ---------- */
+/* Modal */
+#modal.MuiPaper-root{background:var(--panel);border-radius:20px}
+.option{background:#ffffff0d;border:1px solid #ffffff1f;border-radius:14px}
+.option:focus{background:#fff;color:#111;outline:none}
+.option:focus span{color:#333}
+
+/* Phone */
 @media(max-width:760px){
-    body:not(.tv) .app-toolbar.MuiToolbar-root{min-height:52px}
-    body:not(.tv) .brand{font-size:24px}
+    body:not(.tv) .topbar{height:52px}
+    body:not(.tv) .clock,body:not(.tv) .topbar-title{display:none}
     body:not(.tv) #tabs{position:fixed;left:0;right:0;bottom:0;z-index:5;margin:0;padding:6px 8px 8px;gap:0;flex-wrap:nowrap;justify-content:space-around;
-        background:#111313f2;backdrop-filter:blur(14px);border-top:1px solid var(--line)}
-    body:not(.tv) #tabs .MuiButton-root{flex:1;flex-direction:column;gap:3px;min-height:56px;padding:6px 2px;font-size:12px;font-weight:600;border-radius:14px;background:none;color:var(--muted)}
-    body:not(.tv) #tabs .MuiButton-startIcon{margin:0;padding:3px 18px;border-radius:16px;transition:background .15s}
-    body:not(.tv) #tabs .MuiButton-root[aria-current=page]{background:none;color:var(--gold)}
-    body:not(.tv) #tabs .MuiButton-root[aria-current=page] .MuiButton-startIcon{background:#f0cf9429}
-    body:not(.tv) main{padding-top:8px;padding-bottom:104px}
+        background:#1d1f20f5;backdrop-filter:blur(14px);border-top:1px solid var(--line)}
+    body:not(.tv) #tabs .MuiButton-root{flex:1;flex-direction:column;gap:3px;min-height:54px;padding:6px 2px;font-size:12px;font-weight:600;border-radius:14px;background:none;color:var(--muted)}
+    body:not(.tv) #tabs .MuiButton-startIcon{margin:0;padding:3px 18px;border-radius:16px}
+    body:not(.tv) #tabs .MuiButton-root[aria-current=page]{color:#fff;background:none}
+    body:not(.tv) #tabs .MuiButton-root[aria-current=page] .MuiButton-startIcon{background:#ffffff1f}
+    body:not(.tv) main{padding-bottom:100px}
     body:not(.tv) .grid:not(.row){grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 10px}
-    body:not(.tv) .grid.row{grid-auto-columns:31%;gap:10px}
+    body:not(.tv) .grid.row{grid-auto-columns:30%;gap:10px}
     body:not(.tv) .grid .card strong{font-size:13px;margin-top:7px}
     body:not(.tv) .grid .card small{font-size:11px}
-    body:not(.tv) .art-fallback{font-size:36px}
-    body:not(.tv) .score{font-size:11px;top:5px;left:5px}
-    body:not(.tv) .hero{min-height:220px;padding:20px}
-    body:not(.tv) .hero h1{font-size:34px;max-width:100%}
-    body:not(.tv) .bar{flex-direction:column;align-items:flex-start;gap:10px;margin-top:24px}
-    body:not(.tv) .bar .chips{flex-wrap:nowrap;overflow-x:auto;max-width:100%}
-    body:not(.tv) .backdrop{min-height:260px;margin-inline:calc(-1*var(--space));border-radius:0;padding:20px var(--space) 70px}
-    body:not(.tv) .backdrop h1{font-size:30px;max-width:100%}
-    body:not(.tv) .detailbody{padding-inline:0;margin-top:-52px}
+    body:not(.tv) .score{font-size:13px}
+    body:not(.tv) .title-head{gap:16px}
+    body:not(.tv) .title-poster{width:116px}
+    body:not(.tv) .title-info h1{font-size:24px}
+    body:not(.tv) .genres{font-size:13px}
+    body:not(.tv) .fact{font-size:12px}
+    body:not(.tv) .detailbody>.actions:first-child{margin-top:18px}
     body:not(.tv) .actions .primary,body:not(.tv) .mui-play-actions .MuiButton-contained{flex:1 1 100%;justify-content:center;text-align:center;min-height:50px;font-size:16px}
-    body:not(.tv) .back{margin:0 0 6px;min-height:40px;padding:6px 4px}
-    body:not(.tv) h2{font-size:26px}
-    body:not(.tv) .hero{min-height:200px}
 }
-/* TV: brand, sections and settings share one compact top line, leaving the screen to the catalogue. */
-.tv #chrome{position:relative;border-bottom:1px solid var(--line)}
-.tv #tabs{position:absolute;top:0;bottom:0;left:calc(var(--space) + 150px);margin:0;padding:0;border:0;align-items:center;flex-wrap:nowrap}
-.tv #tabs .MuiButton-root{min-height:44px;padding:6px 18px}
-.tv .app-toolbar.MuiToolbar-root{min-height:64px}
-.tv main{padding-top:18px}
-.tv .hero{min-height:clamp(150px,30vh,300px);padding:24px 36px}
-.tv .hero h1{font-size:44px}
-.tv .hero:focus{outline-offset:4px}
-.tv .bar{margin:24px 0 12px}
