@@ -46,10 +46,43 @@ function note(title,message,action,label='Повторить') {
 function failure(error,retry) {
     root.append(note('Не удалось загрузить',error.message,retry),btn('Настройки зеркала',settings,'subtle'));
 }
+const sectionTitles={home:'Главная',catalog:'Каталог',movies:'Фильмы',series:'Сериалы',search:'Поиск',library:'Избранное'};
+const categorySections={'Все':'home','Каталог':'catalog','Фильмы':'movies','Сериалы':'series'};
+function currentSection(){return tab==='home'?categorySections[category]:tab;}
+function drawChrome(){const s=currentSection();SeansUI.selectTab(tab,s,sectionTitles[s]);}
 function setTab(value) {
     tab=value;detail=null;currentItem=null;++version;
-    SeansUI.selectTab(value);
+    drawChrome();
     window.scrollTo(0,0);
+}
+// Side menu, as in TV media centres: opens with the menu button or the left arrow at the left edge.
+let menuOpen=false, menuReturn=null;
+function openMenu(){
+    if(menuOpen || dialog)return;
+    menuOpen=true;menuReturn=document.activeElement;SeansUI.menu(true);root.inert=true;document.body.classList.add('menu-open');
+    focus(document.querySelector('#sidemenu .on') || document.querySelector('#sidemenu button'));
+}
+function closeMenu(restore=true){
+    if(!menuOpen)return;
+    menuOpen=false;SeansUI.menu(false);root.inert=false;document.body.classList.remove('menu-open');
+    if(restore)focus(menuReturn && menuReturn.isConnected && !menuReturn.closest('#sidemenu')?menuReturn:entry());
+    menuReturn=null;
+}
+function toggleMenu(){if(menuOpen)closeMenu();else openMenu();}
+function entry(){
+    // Where focus lands after switching sections: the first card, else the first control of the page.
+    return root.querySelector('.card') || root.querySelector('button:not(.back),input') || document.querySelector('[data-tab].on');
+}
+function openSection(id){
+    closeMenu(false);
+    if(id==='settings'){settings();return;}
+    if(id==='search' || id==='library'){navigate(id);}
+    else{
+        const next=Object.keys(categorySections).find(c=>categorySections[c]===id) || 'Все';
+        if(tab!=='home' || currentItem){category='Все';section=null;navigate('home');}
+        if(next!=='Все')selectCategory(next);else if(category!=='Все'){category='Все';section=null;showHome();drawChrome();}
+    }
+    if(mode==='tv')setTimeout(()=>focus(entry()),60);
 }
 function navigate(name) {
     setTab(name); if(name==='home')showHome();else if(name==='search')showSearch();else showLibrary();
@@ -57,17 +90,18 @@ function navigate(name) {
 function grid(items) {
     return SeansUI.grid(items.map(item=>({item,meta:meta(item),open:button=>openItem(item,item.url,button)})));
 }
-function hero(item) {
-    const b=btn('',()=>openItem(item,item.url,b),'hero');
-    const image=img(item.poster);
-    b.append(image,el('span','eyeline','В центре внимания'),el('h1','',item.title),el('span','meta',meta(item)));
-    getDetail(item.url).then(d=>{if(b.isConnected && d.backdrop)image.src=d.backdrop;}).catch(()=>{});return b;
-}
 async function getDetail(url) {
     if(detailCache.has(url)){const hit=detailCache.get(url);detailCache.delete(url);detailCache.set(url,hit);return hit;}
     const data=await request('detail',{url});
     if(detailCache.size>=40)detailCache.delete(detailCache.keys().next().value);
     detailCache.set(url,data);return data;
+}
+const sectionCache=new Map();
+async function categoryData(name){
+    // 'Каталог' is the catalogue's own first page; films and series have pages of their own on most sites.
+    if(name==='Каталог' || !home.categories[name])return home;
+    if(!sectionCache.has(name))sectionCache.set(name,await request('list',{mirror:home.root,page:home.categories[name]}));
+    return sectionCache.get(name);
 }
 async function showHome() {
     const token=++version;
@@ -78,31 +112,38 @@ async function showHome() {
     }
     if(token!==version)return;
     root.replaceChildren();
-    if(category==='Все' && home.items[0])root.append(hero(home.items[0]));
-    if(category==='Все'){
-        const continued=viewings.filter(h=>!h.finished).slice(0,16);
-        if(continued.length)root.append(shelf('Продолжить просмотр',continueGrid(continued)));
-        if(favorites.length)root.append(shelf('Избранное',grid(favorites.slice(0,16))));
-    }
-    const bar=el('div','bar');bar.append(el('h2','','Каталог'));const chips=el('div','chips');
-    for(const label of ['Все','Фильмы','Сериалы']) {
-        const b=btn(label,()=>selectCategory(label),'chip'+(category===label?' active':''));b.dataset.category=label;chips.append(b);
-    }
-    bar.append(chips);root.append(bar);
-    const data=category==='Все'? home : section;
-    let items=data ? data.items : home.items.filter(i=>i.kind===(category==='Фильмы'?'Фильм':'Сериал'));
+    if(category==='Все'){showShelves(token);return;}
+    if(['Каталог','Фильмы','Сериалы'].includes(category)){showFeed(category,token);return;}
+    const data=section || home;
+    const kind=category==='Фильмы'?'Фильм':category==='Сериалы'?'Сериал':'';
+    const items=section || category==='Каталог' ? data.items : home.items.filter(i=>i.kind===kind);
+    root.append(el('h1','page-title',category));
     root.append(grid(items));
     if(!items.length)root.append(note('Пока пусто','Попробуйте поиск по названию.'));
-    if(data && data.next)more(data,showHome);
+    if(data.next && (section || category==='Каталог'))more(data,showHome);
+    settleFocus();
+}
+function settleFocus(){
+    // On a TV something must always be focused, or the remote seems dead.
+    const a=document.activeElement;
+    if(mode==='tv' && !dialog && !menuOpen && (!a || a===document.body || !a.isConnected))focus(entry());
+}
+function showShelves(token){
+    const continued=viewings.filter(h=>!h.finished).slice(0,16);
+    if(continued.length)root.append(shelf('Досмотреть',continueGrid(continued)));
+    root.append(shelf('Новое в каталоге',grid(home.items.slice(0,20)),'Каталог'));
+    root.append(feedShelf('Фильмы','Фильмы со всех источников'),feedShelf('Сериалы','Сериалы со всех источников'));
+    if(favorites.length)root.append(shelf('Избранное',grid(favorites.slice(0,16))));
+    settleFocus();
 }
 async function selectCategory(value) {
     if(value===category)return;
-    category=value;section=null;
-    if(value==='Все' || !home.categories[value]){await showHome();return;}
+    category=value;section=null;drawChrome();window.scrollTo(0,0);
+    if(value==='Все' || value==='Каталог' || !home || !home.categories[value]){await showHome();return;}
     const token=++version;root.replaceChildren(note('Загружаю '+value.toLowerCase()+'…',''));
-    try{const data=await request('list',{mirror:home.root,page:home.categories[value]});
+    try{const data=await categoryData(value);
         if(token!==version)return;section=data;await showHome();
-        focus([...document.querySelectorAll('[data-category]')].find(b=>b.dataset.category===value));}
+        if(mode==='tv')focus(entry());}
     catch(e){if(token===version){root.replaceChildren();failure(e,()=>{category='Все';selectCategory(value);});}}
 }
 function more(data,render) {
@@ -118,9 +159,11 @@ function more(data,render) {
         }catch(e){b.disabled=false;b.textContent='Повторить загрузку';b.title=e.message;}
     },'secondary more');root.append(b);
 }
-function shelf(title,region) {
+function shelf(title,region,moreCategory) {
     const block=el('section','shelf-block');region.classList.add('row');
-    block.append(el('h2','shelf-title',title),region);return block;
+    const head=el('div','shelf-head');head.append(el('h2','shelf-title',title));
+    if(moreCategory)head.append(btn('Ещё',()=>selectCategory(moreCategory),'more-link'));
+    block.append(head,region);return block;
 }
 function continueGrid(list) {
     return SeansUI.grid(list.map(h=>({
@@ -201,12 +244,21 @@ async function selectPart(part,isSeason) {
 function showDetail(moveFocus=false) {
     const item=currentItem,d=detail;
     root.replaceChildren(btn('‹ Назад',back,'subtle back'));
-    const banner=el('div','backdrop');banner.append(img(d.backdrop||item.poster));const h=el('div');
+    // Title page: dimmed backdrop over the whole screen, poster on the left, facts and actions beside it.
+    const bg=el('div','title-bg');bg.append(img(d.backdrop||item.poster));root.append(bg);
+    const banner=el('div','title-head'),poster=el('div','title-poster'),h=el('div','title-info');
+    poster.append(img(item.poster));
+    if(item.kind==='Сериал' || seasons.length)poster.append(el('span','tag-tv','TV'));
     h.append(el('div','eyeline',meta(item)),el('h1','',item.title));
+    const facts=el('div','facts');
+    if(item.score)facts.append(el('span','fact rating',item.score));
+    if(seasons.length)facts.append(el('span','fact','Сезонов: '+seasons.length));
+    if(episodes.length)facts.append(el('span','fact','Серий: '+episodes.length));
+    if(facts.childElementCount)h.append(facts);
     if(d.genres)h.append(el('p','genres',d.genres));
-    banner.append(h);root.append(banner);
+    banner.append(poster,h);root.append(banner);
     const body=el('div','detailbody');root.append(body);
-    const actions=el('div','wrap actions');body.append(actions);
+    const actions=el('div','wrap actions');(mode==='tv'?h:body).append(actions);
     const hasEpisodeList=seasons.length>0 || episodes.length>0;
     const selectable=!hasEpisodeList || !!activeEpisode;
     let primary;
@@ -275,6 +327,7 @@ function sourceDialog(){
 function beginDialog(kind,title){
     if(!dialog)priorFocus=document.activeElement;
     dialog=kind;veil.hidden=false;
+    closeMenu(false);
     for(const n of [document.querySelector('header'),$('tabs'),root])n.inert=true;
     document.body.style.overflow='hidden';modal.replaceChildren();const h=el('h2','',title);h.id='modalTitle';modal.append(h);
 }
@@ -292,9 +345,10 @@ function modePicker(first) {
     modal.append(SeansUI.modes(choose));if(!first)modal.append(btn('Назад',settings,'subtle'));
     const preferred=mode==='tv'||(!mode && Cinema.isTelevision())?'tv':'mobile';
     focus(modal.querySelector('[data-mode="'+preferred+'"]'));
-    function choose(v){applyMode(v);dialog='mode';closeDialog();if(first){navigate('home');if(v==='tv')focus(document.querySelector('[data-tab=home]'));}else settings();}
+    function choose(v){applyMode(v);dialog='mode';closeDialog();if(first){navigate('home');if(v==='tv')focus(entry());}else settings();}
 }
 function back() {
+    if(menuOpen){closeMenu();return true;}
     if(dialog==='first')return false;
     if(dialog==='torrent-list'){otherSites();return true;}
     if(dialog==='mode'){settings();return true;}
@@ -302,15 +356,15 @@ function back() {
     if(dialog){closeDialog();return true;}
     if(currentItem){
         const url=currentItem.url,scroll=returnScroll;currentItem=null;detail=null;navigate(tab);
-        requestAnimationFrame(()=>{window.scrollTo(0,scroll);const b=[...root.querySelectorAll('.card')].find(n=>n.dataset.url===url || (titleButton && titleButton.dataset.focusId && titleButton.dataset.focusId===n.dataset.focusId));focus(b || (titleButton && titleButton.classList.contains('hero')?root.querySelector('.hero'):null) || document.querySelector('[data-tab].on'));});
+        requestAnimationFrame(()=>{window.scrollTo(0,scroll);const b=[...root.querySelectorAll('.card')].find(n=>n.dataset.url===url || (titleButton && titleButton.dataset.focusId && titleButton.dataset.focusId===n.dataset.focusId));focus(b || entry());});
         return true;
     }
-    if(tab!=='home'){navigate('home');focus(document.querySelector('[data-tab=home]'));return true;}
+    if(tab!=='home'){navigate('home');focus(entry());return true;}
     if(category!=='Все'){selectCategory('Все');return true;}
     return false;
 }
 function moveFocus(key){
-    const scope=dialog?modal:document;
+    const scope=dialog?modal:menuOpen?$('sidemenu'):document;
     const nodes=[...scope.querySelectorAll('button,input,select')].filter(n=>!n.disabled && !n.closest('[inert]') && n.getClientRects().length);
     const current=document.activeElement;if(!nodes.includes(current)){if(nodes[0])nodes[0].focus();return true;}
     const r=current.getBoundingClientRect(),vertical=key==='ArrowDown'||key==='ArrowUp',sign=(key==='ArrowRight'||key==='ArrowDown')?1:-1;
@@ -320,8 +374,11 @@ function moveFocus(key){
         const overlap=vertical? (b.right>r.left && b.left<r.right) : (b.bottom>r.top && b.top<r.bottom);
         return {n,dist,score:dist+side*(overlap ? 0.45 : 4)+(overlap?0:100)};
     }).filter(x=>x.dist>3).sort((a,b)=>a.score-b.score);
+    if(menuOpen && key==='ArrowRight'){closeMenu();return true;}
     if(choices.length){const next=choices[0].n;next.focus({preventScroll:true});reveal(next);}
-    else if(vertical && !dialog)window.scrollBy({top:sign*Math.round(window.innerHeight*0.45),behavior:'smooth'});
+    else if(vertical && !dialog && !menuOpen)window.scrollBy({top:sign*Math.round(window.innerHeight*0.45),behavior:'smooth'});
+    else if(key==='ArrowLeft' && !dialog)openMenu();
+    else if(key==='ArrowRight' && menuOpen)closeMenu();
     return true;
 }
 document.addEventListener('keydown',e=>{
@@ -331,5 +388,5 @@ document.addEventListener('keydown',e=>{
     if(e.target.tagName==='INPUT' && !e.target.readOnly && e.target.type!=='checkbox' && ['ArrowLeft','ArrowRight'].includes(e.key))return;
     e.preventDefault();moveFocus(e.key);
 });
-if(mode==='tv'||mode==='mobile'){applyMode(mode);navigate('home');if(mode==='tv')focus(document.querySelector('[data-tab=home]'));}
+if(mode==='tv'||mode==='mobile'){applyMode(mode);navigate('home');if(mode==='tv')focus(entry());}
 else modePicker(true);

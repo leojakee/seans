@@ -29,6 +29,18 @@ final class History {
         }
         save(context,item,page,title,0,0,false);
     }
+    /** Removes one title from "continue watching"; the saved position goes with it. */
+    static void forget(Context context,String page) {
+        JSONArray old=all(context), rows=new JSONArray();
+        for (int i=0; i<old.length(); i++) {
+            JSONObject row=old.optJSONObject(i);
+            if (row != null && !page.equals(row.optString("page"))) rows.put(row);
+        }
+        context.getSharedPreferences("library",0).edit().putString("history",rows.toString()).apply();
+    }
+    static void clear(Context context) {
+        context.getSharedPreferences("library",0).edit().remove("history").apply();
+    }
     static void save(Context context,JSONObject item,String page,String title,long position,long duration,boolean finished) {
         try {
             JSONArray old=all(context), rows=new JSONArray();

@@ -53,7 +53,7 @@ function switchSite(data) {
 }
 function selectSite(data) {
     switchSite(data);results=null;query='';searchDraft='';detailCache.clear();
-    searchFilters.site='';closeDialog();navigate('home');focus(document.querySelector('[data-tab=home]'));
+    searchFilters.site='';closeDialog();navigate('home');focus(entry());
 }
 async function catalogWithFallback(token) {
     const preferred=mirror;
@@ -80,7 +80,7 @@ async function catalogWithFallback(token) {
 function settings() {
     beginDialog('settings','Настройки');
     modal.append(SeansUI.settings({tv:mode==='tv',maximum:Cinema.maximumQuality(),sites:searchSites().length,
-        changeMode:()=>modePicker(false),changeSites:manageSearchSites,setMaximum:value=>Cinema.setMaximumQuality(value)}),
+        changeMode:()=>modePicker(false),changeSites:manageSearchSites,setMaximum:value=>Cinema.setMaximumQuality(value),tiles:'скоро',changeTiles:()=>{}}),
         el('h3','section','Основной каталог'));
     const input=el('input','address');input.type='url';input.setAttribute('aria-label','Адрес зеркала');input.value=mirror;
     const info=el('p','note');

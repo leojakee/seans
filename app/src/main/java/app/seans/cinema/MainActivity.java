@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
     private static final String BASE = "https://appassets.androidplatform.net/";
-    private static final Set<String> FILES = new java.util.HashSet<>(java.util.Arrays.asList("index.html","screen.css","material.js","sources.js","playback.js","search.js","cinema.js"));
+    private static final Set<String> FILES = new java.util.HashSet<>(java.util.Arrays.asList("index.html","screen.css","material.js","sources.js","playback.js","search.js","feed.js","cinema.js"));
     private final ExecutorService network = Executors.newFixedThreadPool(8);
     private final ExecutorService details = Executors.newFixedThreadPool(2);
     private WebView web;
@@ -107,6 +107,8 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public String mirror() { return getPreferences(0).getString("mirror",Catalog.DEFAULT); }
         @JavascriptInterface public String history() { return History.all(MainActivity.this).toString(); }
+        @JavascriptInterface public void forgetViewing(String page) { History.forget(MainActivity.this,page); }
+        @JavascriptInterface public void clearHistory() { History.clear(MainActivity.this); }
         @JavascriptInterface public boolean maximumQuality() { return VideoQuality.maximum(MainActivity.this); }
         @JavascriptInterface public void setMaximumQuality(boolean value) {
             VideoQuality.preferences(MainActivity.this).edit().putBoolean(VideoQuality.MAXIMUM,value).apply();

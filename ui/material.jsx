@@ -1,11 +1,9 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import createCache from '@emotion/cache';
 import {CacheProvider} from '@emotion/react';
 import {ThemeProvider, createTheme} from '@mui/material/styles';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
 import Button from '@mui/material/Button';
 import CardActionArea from '@mui/material/CardActionArea';
 import Chip from '@mui/material/Chip';
@@ -22,11 +20,15 @@ import TuneIcon from '@mui/icons-material/TuneRounded';
 import TvIcon from '@mui/icons-material/TvRounded';
 import PhoneIcon from '@mui/icons-material/SmartphoneRounded';
 import PlayIcon from '@mui/icons-material/PlayArrowRounded';
+import MenuIcon from '@mui/icons-material/MenuRounded';
+import HomeIcon from '@mui/icons-material/HomeOutlined';
+import SeriesIcon from '@mui/icons-material/LiveTvOutlined';
+import ListIcon from '@mui/icons-material/ViewModuleOutlined';
 
 const cache=createCache({key:'seans',nonce:document.querySelector('meta[name=style-nonce]').content,prepend:true});
 const theme=createTheme({
-    palette:{mode:'dark',primary:{main:'#f0cf94',contrastText:'#1d1a12'},background:{default:'#0c0d0d',paper:'#17191a'},
-        text:{primary:'#f7f3e9',secondary:'#babeb5'}},
+    palette:{mode:'dark',primary:{main:'#ffffff',contrastText:'#111213'},background:{default:'#1d1f20',paper:'#26292b'},
+        text:{primary:'#ffffff',secondary:'#a9adb1'}},
     shape:{borderRadius:14}, typography:{fontFamily:'Roboto, Arial, sans-serif',button:{textTransform:'none',fontWeight:600}},
     // A remote control always focuses "by keyboard": the focus ripple then sticks as an oval over the label.
     // Focus is drawn by screen.css instead.
@@ -51,23 +53,46 @@ customElements.define('seans-region',MaterialRegion);
 function region(view,className){
     const host=document.createElement('seans-region');host.view=view;host.className=className;return host;
 }
+// Re-render a region with new content; React keeps the existing cards, so focus and scroll stay put.
+function updateRegion(host,view){
+    host.view=view;
+    if(host.reactRoot)flushSync(()=>host.reactRoot.render(themed(view)));
+}
 
-const sections=[['home','Каталог',MovieIcon],['search','Поиск',SearchIcon],['library','Моя коллекция',LibraryIcon]];
-function Chrome({active}){
+// Sections of the bottom bar (phone) and of the side menu (both modes); opened through window.openSection.
+const sections=[['home','Главная',HomeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon]];
+const menu=[['home','Главная',HomeIcon],['catalog','Каталог',ListIcon],['movies','Фильмы',MovieIcon],['series','Сериалы',SeriesIcon],
+    ['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon],['settings','Настройки',SettingsIcon]];
+function Clock(){
+    const [now,setNow]=useState(new Date());
+    useEffect(()=>{const t=setInterval(()=>setNow(new Date()),15000);return ()=>clearInterval(t);},[]);
+    return <span className="clock"><strong>{now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</strong>
+        <small>{now.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}<br/>{now.toLocaleDateString('ru-RU',{weekday:'long'})}</small></span>;
+}
+function Chrome({active,section,title,menuOpen}){
     return <>
-        <AppBar position="static" color="transparent" elevation={0}>
-            <Toolbar disableGutters className="app-toolbar">
-                <div className="brand"><i className="mark" aria-hidden="true"/>Сеанс</div>
-                <IconButton id="settings" aria-label="Настройки" onClick={()=>window.settings()}><SettingsIcon/></IconButton>
-            </Toolbar>
-        </AppBar>
+        <header className="topbar">
+            <IconButton id="menu-toggle" aria-label="Меню" aria-expanded={menuOpen} onClick={()=>window.toggleMenu()}><MenuIcon/></IconButton>
+            <div className="brand"><i className="mark" aria-hidden="true"/>Сеанс</div>
+            {title && <span className="topbar-title">{title}</span>}
+            <span className="spacer"/>
+            <IconButton aria-label="Поиск" data-top="search" onClick={()=>window.openSection('search')}><SearchIcon/></IconButton>
+            <IconButton id="settings" aria-label="Настройки" onClick={()=>window.settings()}><SettingsIcon/></IconButton>
+            <Clock/>
+        </header>
         <nav id="tabs" aria-label="Разделы">{sections.map(([id,label,Icon])=>
             <Button key={id} data-tab={id} className={active===id?'on':''} aria-current={active===id?'page':undefined}
-                variant={active===id?'contained':'text'} startIcon={<Icon/>} onClick={()=>window.navigate(id)}>{label}</Button>)}</nav>
+                startIcon={<Icon/>} onClick={()=>window.openSection(id)}>{label}</Button>)}</nav>
+        <aside id="sidemenu" className={menuOpen?'open':''} aria-hidden={!menuOpen} inert={!menuOpen}>
+            {menu.map(([id,label,Icon])=><Button key={id} data-menu={id} className={section===id?'on':''} startIcon={<Icon/>}
+                onClick={()=>window.openSection(id)}>{label}</Button>)}
+        </aside>
     </>;
 }
 const chrome=createRoot(document.getElementById('chrome'));
-function selectTab(tab){flushSync(()=>chrome.render(themed(<Chrome active={tab}/>)));}
+const chromeState={active:'home',section:'home',title:'',menuOpen:false};
+function drawChrome(change){Object.assign(chromeState,change);flushSync(()=>chrome.render(themed(<Chrome {...chromeState}/>)));}
+function selectTab(tab,section=tab,title=''){drawChrome({active:tab,section,title});}
 selectTab('home');
 const surface=createRoot(document.getElementById('veil'));
 flushSync(()=>surface.render(themed(<Paper component="section" id="modal" className="modal" role="dialog"
@@ -80,7 +105,8 @@ function PosterGrid({entries}){
             <span className="art">
                 <span className="art-fallback" aria-hidden="true">{(title||item.title||'').slice(0,1)}</span>
                 {item.poster?.startsWith('https://') && <img src={item.poster} alt="" loading="lazy" onError={e=>{e.currentTarget.hidden=true;}}/>}
-                {item.score && <span className="score">★ {item.score}</span>}
+                {item.kind==='Сериал' && <span className="tag-tv">TV</span>}
+                {item.score && <span className="score">{item.score}</span>}
                 {progress>0 && <span className="progress"><i style={{width:Math.min(100,Math.round(progress*100))+'%'}}/></span>}
             </span>
             <strong>{title||item.title}</strong><small>{meta}</small>
@@ -92,13 +118,14 @@ function ModeOptions({choose}){
             <span><strong>{label}</strong><small>{hint}</small></span>
         </Button>);
 }
-function SettingsChoices({tv,maximum,sites,changeMode,changeSites,setMaximum}){
+function SettingsChoices({tv,maximum,sites,changeMode,changeSites,setMaximum,tiles,changeTiles}){
     const [enabled,setEnabled]=useState(maximum);
     return <>
         <Button variant="outlined" startIcon={tv?<TvIcon/>:<PhoneIcon/>} onClick={changeMode}>Режим · {tv?'Телевизор':'Телефон'}</Button>
         <FormControlLabel className="quality-switch" labelPlacement="start" label="Всегда максимальное качество"
             control={<Switch checked={enabled} onChange={(_,value)=>{setMaximum(value);setEnabled(value);}}/>}/>
         <Button variant="outlined" onClick={changeSites}>Источники поиска · {sites}</Button>
+        <Button variant="outlined" startIcon={<ListIcon/>} onClick={changeTiles}>Плитки · {tiles}</Button>
     </>;
 }
 function EntryField({tv,htmlInput,...props}){
@@ -146,8 +173,9 @@ function SearchForm({tv,draft,initial,open,fields,onDraft,onSubmit,onToggle,onCh
     </>;
 }
 window.SeansUI={
-    selectTab,
+    selectTab, menu:open=>drawChrome({menuOpen:open}),
     grid:entries=>region(<PosterGrid entries={entries}/>,'grid'),
+    updateGrid:(host,entries)=>updateRegion(host,<PosterGrid entries={entries}/>),
     modes:choose=>region(<ModeOptions choose={choose}/>,'mui-modes'),
     playActions:(label,external,play)=>region(<>
         <Button variant="contained" className="primary" startIcon={<PlayIcon/>} onClick={()=>play(false)}>{label}</Button>
