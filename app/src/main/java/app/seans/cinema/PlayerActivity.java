@@ -419,8 +419,6 @@ public class PlayerActivity extends Activity {
         audio.setOnClickListener(v->AudioMenu.nativeTracks(this,player));
         Button skip=button("+85 с");tools.addView(skip,tools.getChildCount()-1);
         skip.setOnClickListener(v->{if(player!=null)player.seekTo(Math.min(player.getCurrentPosition()+85000,Math.max(0,player.getDuration()-1000)));});
-        Button sleep=button("Таймер сна");tools.addView(sleep,tools.getChildCount()-1);
-        sleep.setOnClickListener(v->sleepTimer(sleep));
         playerView.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener) visibility-> tools.setVisibility(visibility));
         DefaultHttpDataSource.Factory http=new DefaultHttpDataSource.Factory().setUserAgent(headers.getOrDefault("User-Agent",Catalog.UA))
                 .setDefaultRequestProperties(headers).setConnectTimeoutMs(12000).setReadTimeoutMs(18000);
@@ -478,20 +476,6 @@ public class PlayerActivity extends Activity {
                 if(foreground)target.play();else resumePlay=true;
             }
         },()->{if(!manual)finish();});
-    }
-    // Sleep timer: pauses playback after the chosen number of minutes.
-    private Runnable sleepTask;
-    private void sleepTimer(Button label) {
-        String[] names={"Выключить","15 минут","30 минут","60 минут","90 минут"};
-        int[] minutes={0,15,30,60,90};
-        new AlertDialog.Builder(this).setTitle("Таймер сна").setItems(names,(d,which)->{
-            if(sleepTask!=null)ui.removeCallbacks(sleepTask);
-            sleepTask=null;label.setText("Таймер сна");
-            if(minutes[which]==0)return;
-            sleepTask=()->{if(player!=null)player.pause();label.setText("Таймер сна");sleepTask=null;};
-            ui.postDelayed(sleepTask,minutes[which]*60_000L);
-            label.setText("Сон · "+minutes[which]+" мин");
-        }).show();
     }
     // At the end of an episode: count down 10 seconds, then hand over to the catalogue to start the next one.
     private void nextEpisodeCountdown() {
