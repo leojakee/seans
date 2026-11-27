@@ -219,3 +219,28 @@ main{padding-top:4px}
     body:not(.tv) .detailbody>.actions:first-child{margin-top:18px}
     body:not(.tv) .actions .primary,body:not(.tv) .mui-play-actions .MuiButton-contained{flex:1 1 100%;justify-content:center;text-align:center;min-height:50px;font-size:16px}
 }
+
+/* Tile settings: posters per row and caption size (Settings → Плитки) */
+body.cols-fixed .grid:not(.row){grid-template-columns:repeat(var(--cols),minmax(0,1fr))!important}
+body.cols-fixed .grid.row{grid-auto-columns:calc((100% - (var(--cols) - 1) * 14px) / (var(--cols) + .3))!important}
+body.tiles-s .grid{gap:14px 10px}
+body.tiles-s .grid .card strong{font-size:12px;-webkit-line-clamp:1}
+body.tiles-s .grid .card small{display:none}
+body.tiles-s .score{font-size:12px}
+body.tiles-l .grid .card strong{font-size:18px}
+body.tiles-l .grid .card small{font-size:14px}
+body.tv.tiles-s .grid .card strong{font-size:14px}
+body.tv.tiles-l .grid .card strong{font-size:21px}
+body.tv.tiles-l .grid .card small{font-size:17px}
+.modal .chip.active{background:#fff;color:#111}
+.modal .wrap{margin-top:10px}
+
+/* Local profile */
+.profile{display:flex;gap:22px;align-items:center;margin:14px 0 26px}
+.avatar{flex:none;width:88px;height:88px;border-radius:50%;background:#fff;color:#111;display:grid;place-items:center;font:700 42px/1 Roboto,sans-serif}
+.profile h1{font-size:30px}
+.profile .note{margin-top:6px}
+.profile .actions{margin-top:14px}
+.feed-head{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.feed-marker{padding:26px 0 10px;text-align:center;color:var(--muted);font-size:14px}
+@media(max-width:760px){body:not(.tv) .avatar{width:64px;height:64px;font-size:30px}body:not(.tv) .profile h1{font-size:24px}}

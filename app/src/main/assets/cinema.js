@@ -171,11 +171,37 @@ function continueGrid(list) {
         progress:h.duration>0?h.position/h.duration:0,open:button=>openItem(h.item,h.page,button)
     })));
 }
+// Local profile: everything below lives on this device only (localStorage and the app's own preferences).
+function profileName(){return (localStorage.getItem('profileName') || '').trim();}
+function profileCard(){
+    const card=el('section','profile');
+    const name=profileName() || 'Зритель';
+    const avatar=el('div','avatar',name.slice(0,1).toUpperCase());
+    const info=el('div','profile-info');
+    const watched=viewings.length, finished=viewings.filter(v=>v.finished).length;
+    const minutes=Math.round(viewings.reduce((sum,v)=>sum+(v.finished?(v.duration||v.position||0):(v.position||0)),0)/60000);
+    info.append(el('h1','',name),el('p','note','Открыто: '+watched+' · Досмотрено: '+finished+' · В избранном: '+favorites.length+' · Просмотрено ≈ '+(minutes>=60?Math.floor(minutes/60)+' ч '+minutes%60+' мин':minutes+' мин')));
+    const actions=el('div','wrap actions');
+    actions.append(btn('Изменить имя',renameProfile),btn('Очистить историю',clearHistoryDialog));
+    info.append(actions);card.append(avatar,info);return card;
+}
+function renameProfile(){
+    beginDialog('profile','Как вас зовут?');
+    const input=el('input','address');input.value=profileName();input.maxLength=40;input.setAttribute('aria-label','Имя');
+    const save=btn('Сохранить',()=>{localStorage.setItem('profileName',input.value.trim());closeDialog();showLibrary();},'primary');
+    input.onkeydown=e=>{if(e.key==='Enter')save.click();};
+    modal.append(el('p','note','Имя хранится только на этом устройстве.'),input,save,btn('Отмена',closeDialog,'subtle'));focus(input);
+}
+function clearHistoryDialog(){
+    beginDialog('profile','Очистить историю?');
+    const yes=btn('Очистить',()=>{Cinema.clearHistory();viewings=[];closeDialog();showLibrary();},'primary');
+    modal.append(el('p','note','Пропадут «Досмотреть» и сохранённые позиции просмотра. Избранное останется.'),yes,btn('Отмена',closeDialog,'subtle'));focus(yes);
+}
 function showLibrary() {
-    root.replaceChildren(el('h1','','Моя коллекция'));
+    root.replaceChildren(profileCard());
     const continued=viewings.filter(it=>!it.finished);
     if(continued.length) {
-        root.append(el('h2','shelf titleline','Продолжить просмотр'),continueGrid(continued));
+        root.append(el('h2','shelf titleline','Досмотреть'),continueGrid(continued));
     }
     root.append(el('h2','shelf titleline','Избранное'));
     if(favorites.length)root.append(grid(favorites));
@@ -339,6 +365,38 @@ function closeDialog(){
 }
 function applyMode(value) {
     mode=value;localStorage.setItem('mode',value);document.body.classList.toggle('tv',value==='tv');Cinema.layout(value==='tv');
+    applyTiles();
+}
+// Tile layout chosen in the settings: posters per row (0 = automatic) and size of the captions.
+function tileSettings(){const t=readJson(localStorage.getItem('tiles'),'{}');return {cols:+t.cols||0,size:['s','m','l'].includes(t.size)?t.size:'m'};}
+const tileSizes={s:'Компактные',m:'Обычные',l:'Крупные'};
+function tileLabel(){const t=tileSettings();return (t.cols?t.cols+' в ряду':'авто')+' · '+tileSizes[t.size].toLowerCase();}
+function applyTiles(){
+    const t=tileSettings(), body=document.body;
+    body.classList.toggle('cols-fixed',!!t.cols);
+    if(t.cols)body.style.setProperty('--cols',t.cols);else body.style.removeProperty('--cols');
+    for(const s of ['s','m','l'])body.classList.toggle('tiles-'+s,t.size===s);
+}
+function tilesDialog(focusKey=''){
+    beginDialog('tiles','Плитки');
+    const t=tileSettings();
+    function choose(change){localStorage.setItem('tiles',JSON.stringify({...tileSettings(),...change}));applyTiles();}
+    modal.append(el('h3','section','Сколько в ряду'));
+    const counts=el('div','wrap');
+    const options=mode==='tv'?[0,4,5,6,7,8,9]:[0,2,3,4,5];
+    for(const n of options){
+        const b=btn(n?String(n):'Авто',()=>{choose({cols:n});tilesDialog('c'+n);},'chip'+(t.cols===n?' active':''));
+        b.dataset.key='c'+n;b.setAttribute('aria-pressed',String(t.cols===n));counts.append(b);
+    }
+    modal.append(counts,el('h3','section','Размер'));
+    const sizes=el('div','wrap');
+    for(const s of ['s','m','l']){
+        const b=btn(tileSizes[s],()=>{choose({size:s});tilesDialog('s'+s);},'chip'+(t.size===s?' active':''));
+        b.dataset.key='s'+s;b.setAttribute('aria-pressed',String(t.size===s));sizes.append(b);
+    }
+    modal.append(sizes,btn('Готово',settings,'subtle section'));
+    focus(modal.querySelector('[data-key="'+(focusKey || 'c'+t.cols)+'"]'));
+    if(tab==='home' && !currentItem)showHome();else if(tab==='library' && !currentItem)showLibrary();
 }
 function modePicker(first) {
     beginDialog(first?'first':'mode','Как будете смотреть?');
@@ -353,6 +411,7 @@ function back() {
     if(dialog==='torrent-list'){otherSites();return true;}
     if(dialog==='mode'){settings();return true;}
     if(dialog==='manage-sites'){finishSiteSettings();return true;}
+    if(dialog==='tiles'){settings();return true;}
     if(dialog){closeDialog();return true;}
     if(currentItem){
         const url=currentItem.url,scroll=returnScroll;currentItem=null;detail=null;navigate(tab);
