@@ -16,7 +16,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - name: Version in the tag matches the app
         run: |
           tag="${GITHUB_REF_NAME#v}"
