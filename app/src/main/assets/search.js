@@ -1,5 +1,7 @@
 'use strict';
-let searchDraft='', filtersOpen=false, showSiteStatus=false;
+// focusFirstResult: a TV search was just submitted; followFirstResult: keep the first card focused while
+// more sites answer and the order changes, until the viewer moves with the arrows.
+let searchDraft='', filtersOpen=false, showSiteStatus=false, focusFirstResult=false, followFirstResult=false;
 const filterDefaults={kind:'', from:'', to:'', rating:'', order:'match', site:''};
 let searchFilters=Object.assign({},filterDefaults);
 
@@ -113,6 +115,7 @@ function startSearch(raw,forceExact=false) {
         busy:false,succeeded:false,error:'',retry:null}))};
     results=session;
     const input=$('title-query');if(input)input.blur();
+    focusFirstResult=mode==='tv';
     if(!sites.length)renderSearchResults();
     for(const site of session.sites)readSearchPage(session,site,null);
 }
@@ -167,10 +170,13 @@ function renderSearchResults() {
         },'secondary more');
         more.disabled=session.sites.every(s=>s.busy || s.error || !nextPage(s));more.dataset.focusId='more';out.append(more);
     }
-    if(previous){
+    if((focusFirstResult || followFirstResult) && groups.length){
+        // On a TV the search field gives up focus on submit: land on the first result instead of nowhere.
+        focusFirstResult=false;followFirstResult=true;focus(out.querySelector('.card'));
+    }else if(previous){
         const match=[...out.querySelectorAll('[data-focus-id]')].find(b=>b.dataset.focusId===previous && !b.disabled);
-        const fallback=out.querySelector('.card') || $('search-filter-toggle');
-        (match || fallback).focus({preventScroll:true});
+        const target=match || out.querySelector('.card') || $('search-filter-toggle');
+        target.focus({preventScroll:true});if(mode==='tv')reveal(target);
     }
 }
 function showSearch() {

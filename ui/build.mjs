@@ -16,7 +16,8 @@ const packages=new Map();
 for(const output of Object.values(result.metafile.outputs)){
     for(const [file,details] of Object.entries(output.inputs)){
         if(!details.bytesInOutput || !file.includes('node_modules/'))continue;
-        const absolute=await realpath(path.resolve(here,file));
+        // realpath returns backslashes on Windows; the package lookup below expects POSIX separators.
+        const absolute=(await realpath(path.resolve(here,file))).split(path.sep).join('/');
         const boundary=absolute.lastIndexOf('/node_modules/');
         const parts=absolute.slice(boundary+14).split('/');
         const name=parts[0][0]==='@'?parts.slice(0,2).join('/'):parts[0];

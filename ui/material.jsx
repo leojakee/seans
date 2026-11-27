@@ -25,10 +25,13 @@ import PlayIcon from '@mui/icons-material/PlayArrowRounded';
 
 const cache=createCache({key:'seans',nonce:document.querySelector('meta[name=style-nonce]').content,prepend:true});
 const theme=createTheme({
-    palette:{mode:'dark',primary:{main:'#eed09d',contrastText:'#222016'},background:{default:'#121413',paper:'#202420'},
+    palette:{mode:'dark',primary:{main:'#f0cf94',contrastText:'#1d1a12'},background:{default:'#0c0d0d',paper:'#17191a'},
         text:{primary:'#f7f3e9',secondary:'#babeb5'}},
-    shape:{borderRadius:12}, typography:{fontFamily:'Roboto, Arial, sans-serif',button:{textTransform:'none',fontWeight:600}},
-    components:{MuiButton:{defaultProps:{disableElevation:true}},MuiTextField:{defaultProps:{size:'small',variant:'outlined'}}}
+    shape:{borderRadius:14}, typography:{fontFamily:'Roboto, Arial, sans-serif',button:{textTransform:'none',fontWeight:600}},
+    // A remote control always focuses "by keyboard": the focus ripple then sticks as an oval over the label.
+    // Focus is drawn by screen.css instead.
+    components:{MuiButton:{defaultProps:{disableElevation:true,focusRipple:false}},MuiIconButton:{defaultProps:{focusRipple:false}},
+        MuiTextField:{defaultProps:{size:'small',variant:'outlined'}}}
 });
 function themed(content){return <CacheProvider value={cache}><ThemeProvider theme={theme}>{content}</ThemeProvider></CacheProvider>;}
 
@@ -71,12 +74,14 @@ flushSync(()=>surface.render(themed(<Paper component="section" id="modal" classN
     aria-modal="true" aria-labelledby="modalTitle" elevation={8}/>)));
 
 function PosterGrid({entries}){
-    return entries.map(({item,title,meta,focusId,open})=>
+    return entries.map(({item,title,meta,focusId,open,progress})=>
         <CardActionArea key={focusId||item.url} className="card" data-url={item.url} data-focus-id={focusId}
             onClick={e=>open(e.currentTarget)}>
             <span className="art">
+                <span className="art-fallback" aria-hidden="true">{(title||item.title||'').slice(0,1)}</span>
                 {item.poster?.startsWith('https://') && <img src={item.poster} alt="" loading="lazy" onError={e=>{e.currentTarget.hidden=true;}}/>}
                 {item.score && <span className="score">★ {item.score}</span>}
+                {progress>0 && <span className="progress"><i style={{width:Math.min(100,Math.round(progress*100))+'%'}}/></span>}
             </span>
             <strong>{title||item.title}</strong><small>{meta}</small>
         </CardActionArea>);
