@@ -292,7 +292,7 @@ function modePicker(first) {
     modal.append(SeansUI.modes(choose));if(!first)modal.append(btn('Назад',settings,'subtle'));
     const preferred=mode==='tv'||(!mode && Cinema.isTelevision())?'tv':'mobile';
     focus(modal.querySelector('[data-mode="'+preferred+'"]'));
-    function choose(v){applyMode(v);dialog='mode';closeDialog();if(first){navigate('home');focus(document.querySelector('[data-tab=home]'));}else settings();}
+    function choose(v){applyMode(v);dialog='mode';closeDialog();if(first){navigate('home');if(v==='tv')focus(document.querySelector('[data-tab=home]'));}else settings();}
 }
 function back() {
     if(dialog==='first')return false;
