@@ -305,6 +305,8 @@ async function selectPart(part,isSeason) {
         else activeEpisode=part.url;
         showDetail(!isSeason);
         if(isSeason)focus(root.querySelector('[data-episode]'));
+        // Season, then episode, then voice-over: picking an episode opens the voice-over list from every source.
+        else if(seriesContext())otherSites();
     }catch(e){if(token===version)status.textContent=e.message;}
 }
 function showDetail(moveFocus=false) {
@@ -351,7 +353,7 @@ function showDetail(moveFocus=false) {
     }
     if(d.website)actions.append(btn('Открыть страницу Zona',()=>Cinema.play(JSON.stringify(item),JSON.stringify({page:d.page,title:d.title,players:[{label:'Zona',type:'site',url:d.website}]}),0,false)));
     const chosen=series && sourcePreferences(series).choice;
-    const sourceLabel=series?(chosen?'Источник · '+chosen.label+(chosen.edition?' ✂':''):'Выбрать источник'):'Источник · '+sourceName(item.url);
+    const sourceLabel=series?(chosen?'Озвучка · '+chosen.label+(chosen.edition?' ✂':''):'Выбрать озвучку'):'Источник · '+sourceName(item.url);
     const sites=btn(sourceLabel,otherSites);sites.dataset.sites='';actions.append(sites);
     if(series && !Cinema.maximumQuality()){
         const season=qualitySeason(series), saved=Cinema.savedQuality(season);
