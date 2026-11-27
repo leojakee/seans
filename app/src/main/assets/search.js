@@ -169,6 +169,8 @@ function renderSearchResults() {
             session.sites.filter(s=>!s.error && !s.busy && nextPage(s)).forEach(s=>readSearchPage(session,s,nextPage(s)));
         },'secondary more');
         more.disabled=session.sites.every(s=>s.busy || s.error || !nextPage(s));more.dataset.focusId='more';out.append(more);
+        // Load the next pages by themselves once the end of the list comes into view.
+        autoLoad(more,async()=>{if(!more.disabled)more.click();});
     }
     if((focusFirstResult || followFirstResult) && groups.length){
         // On a TV the search field gives up focus on submit: land on the first result instead of nowhere.

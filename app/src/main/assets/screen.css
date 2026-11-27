@@ -219,3 +219,50 @@ main{padding-top:4px}
     body:not(.tv) .detailbody>.actions:first-child{margin-top:18px}
     body:not(.tv) .actions .primary,body:not(.tv) .mui-play-actions .MuiButton-contained{flex:1 1 100%;justify-content:center;text-align:center;min-height:50px;font-size:16px}
 }
+
+/* Tile settings: posters per row and caption size (Settings → Плитки) */
+body.cols-fixed .grid:not(.row){grid-template-columns:repeat(var(--cols),minmax(0,1fr))!important}
+body.cols-fixed .grid.row{grid-auto-columns:calc((100% - (var(--cols) - 1) * 14px) / (var(--cols) + .3))!important}
+body.tiles-s .grid{gap:14px 10px}
+body.tiles-s .grid .card strong{font-size:12px;-webkit-line-clamp:1}
+body.tiles-s .grid .card small{display:none}
+body.tiles-s .score{font-size:12px}
+body.tiles-l .grid .card strong{font-size:18px}
+body.tiles-l .grid .card small{font-size:14px}
+body.tv.tiles-s .grid .card strong{font-size:14px}
+body.tv.tiles-l .grid .card strong{font-size:21px}
+body.tv.tiles-l .grid .card small{font-size:17px}
+.modal .chip.active{background:#fff;color:#111}
+.modal .wrap{margin-top:10px}
+
+/* Local profile */
+.profile{display:flex;gap:22px;align-items:center;margin:14px 0 26px}
+.avatar{flex:none;width:88px;height:88px;border-radius:50%;background:#fff;color:#111;display:grid;place-items:center;font:700 42px/1 Roboto,sans-serif}
+.profile h1{font-size:30px}
+.profile .note{margin-top:6px}
+.profile .actions{margin-top:14px}
+.feed-head{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.feed-marker{padding:26px 0 10px;text-align:center;color:var(--muted);font-size:14px}
+@media(max-width:760px){body:not(.tv) .avatar{width:64px;height:64px;font-size:30px}body:not(.tv) .profile h1{font-size:24px}}
+
+/* Menu button, scrim and logo */
+.topbar .menu-button.MuiButton-root{min-width:0;min-height:42px;padding:6px 14px 6px 12px;border-radius:999px;background:#ffffff14;color:#fff;font-size:15px;font-weight:600}
+.topbar .menu-button .MuiButton-startIcon{margin-right:6px}
+.topbar .menu-button:focus,.topbar .menu-button:focus-visible{background:#fff;color:#111;outline:none}
+.tv .topbar .menu-button.MuiButton-root{min-height:46px;font-size:17px}
+#menu-scrim{position:fixed;inset:0;z-index:8;background:#000a;opacity:0;pointer-events:none;transition:opacity .2s}
+#menu-scrim.open{opacity:1;pointer-events:auto}
+body.menu-open main,body.menu-open #tabs{opacity:1}
+.brand{display:flex;align-items:center;gap:9px;margin:0 6px 0 12px}
+.topbar .brand{font:inherit;letter-spacing:0;margin:0 6px 0 12px}
+.logo-mark{width:30px;height:30px;flex:none;filter:drop-shadow(0 2px 6px #ffb02055)}
+.logo-text{font:800 23px/1 Roboto,Arial,sans-serif;letter-spacing:-.6px;color:#fff}
+.logo-text:after{content:"";display:inline-block;width:6px;height:6px;margin-left:3px;border-radius:50%;background:#ffc93a;vertical-align:baseline}
+.menu-head{padding:2px 6px 18px;margin-bottom:6px;border-bottom:1px solid #ffffff14}
+.menu-head .brand{margin:0}
+#sidemenu{padding-top:22px;z-index:9}
+.tv .logo-mark{width:34px;height:34px}.tv .logo-text{font-size:26px}
+@media(max-width:760px){body:not(.tv) .menu-label{display:none}body:not(.tv) .topbar .menu-button.MuiButton-root{padding:8px}body:not(.tv) .topbar .menu-button .MuiButton-startIcon{margin:0}}
+
+.update-banner{display:block;width:100%;margin:6px 0 18px;padding:14px 18px;border-radius:14px;background:#ffc93a;color:#17191a;font-weight:700;font-size:16px;text-align:left}
+.update-banner:focus{outline:3px solid #fff;outline-offset:2px}

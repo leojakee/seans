@@ -46,7 +46,7 @@ function note(title,message,action,label='Повторить') {
 function failure(error,retry) {
     root.append(note('Не удалось загрузить',error.message,retry),btn('Настройки зеркала',settings,'subtle'));
 }
-const sectionTitles={home:'Главная',catalog:'Каталог',movies:'Фильмы',series:'Сериалы',search:'Поиск',library:'Избранное'};
+const sectionTitles={home:'Главная',catalog:'Каталог',movies:'Фильмы',series:'Сериалы',continue:'Досмотреть',search:'Поиск',library:'Избранное'};
 const categorySections={'Все':'home','Каталог':'catalog','Фильмы':'movies','Сериалы':'series'};
 function currentSection(){return tab==='home'?categorySections[category]:tab;}
 function drawChrome(){const s=currentSection();SeansUI.selectTab(tab,s,sectionTitles[s]);}
@@ -76,7 +76,7 @@ function entry(){
 function openSection(id){
     closeMenu(false);
     if(id==='settings'){settings();return;}
-    if(id==='search' || id==='library'){navigate(id);}
+    if(id==='search' || id==='library' || id==='continue'){navigate(id);}
     else{
         const next=Object.keys(categorySections).find(c=>categorySections[c]===id) || 'Все';
         if(tab!=='home' || currentItem){category='Все';section=null;navigate('home');}
@@ -85,7 +85,7 @@ function openSection(id){
     if(mode==='tv')setTimeout(()=>focus(entry()),60);
 }
 function navigate(name) {
-    setTab(name); if(name==='home')showHome();else if(name==='search')showSearch();else showLibrary();
+    setTab(name); if(name==='home')showHome();else if(name==='search')showSearch();else if(name==='continue')showContinue();else showLibrary();
 }
 function grid(items) {
     return SeansUI.grid(items.map(item=>({item,meta:meta(item),open:button=>openItem(item,item.url,button)})));
@@ -129,6 +129,7 @@ function settleFocus(){
     if(mode==='tv' && !dialog && !menuOpen && (!a || a===document.body || !a.isConnected))focus(entry());
 }
 function showShelves(token){
+    const banner=updateBanner();if(banner)root.append(banner);
     const continued=viewings.filter(h=>!h.finished).slice(0,16);
     if(continued.length)root.append(shelf('Досмотреть',continueGrid(continued)));
     root.append(shelf('Новое в каталоге',grid(home.items.slice(0,20)),'Каталог'));
@@ -171,11 +172,76 @@ function continueGrid(list) {
         progress:h.duration>0?h.position/h.duration:0,open:button=>openItem(h.item,h.page,button)
     })));
 }
+// Local profile: everything below lives on this device only (localStorage and the app's own preferences).
+function profileName(){return (localStorage.getItem('profileName') || '').trim();}
+function profileCard(){
+    const card=el('section','profile');
+    const name=profileName() || 'Зритель';
+    const avatar=el('div','avatar',name.slice(0,1).toUpperCase());
+    const info=el('div','profile-info');
+    const watched=viewings.length, finished=viewings.filter(v=>v.finished).length;
+    const minutes=Math.round(viewings.reduce((sum,v)=>sum+(v.finished?(v.duration||v.position||0):(v.position||0)),0)/60000);
+    info.append(el('h1','',name),el('p','note','Открыто: '+watched+' · Досмотрено: '+finished+' · В избранном: '+favorites.length+' · Просмотрено ≈ '+(minutes>=60?Math.floor(minutes/60)+' ч '+minutes%60+' мин':minutes+' мин')));
+    const actions=el('div','wrap actions');
+    actions.append(btn('Изменить имя',renameProfile),btn('Очистить историю',clearHistoryDialog));
+    info.append(actions);card.append(avatar,info);return card;
+}
+function renameProfile(){
+    beginDialog('profile','Как вас зовут?');
+    const input=el('input','address');input.value=profileName();input.maxLength=40;input.setAttribute('aria-label','Имя');
+    const save=btn('Сохранить',()=>{localStorage.setItem('profileName',input.value.trim());closeDialog();showLibrary();},'primary');
+    input.onkeydown=e=>{if(e.key==='Enter')save.click();};
+    modal.append(el('p','note','Имя хранится только на этом устройстве.'),input,save,btn('Отмена',closeDialog,'subtle'));focus(input);
+}
+function clearHistoryDialog(){
+    beginDialog('profile','Очистить историю?');
+    const yes=btn('Очистить',()=>{Cinema.clearHistory();viewings=[];closeDialog();showLibrary();},'primary');
+    modal.append(el('p','note','Пропадут «Досмотреть» и сохранённые позиции просмотра. Избранное останется.'),yes,btn('Отмена',closeDialog,'subtle'));focus(yes);
+}
+// Updates from the GitHub releases of the app: checked at start (at most every 6 hours) and from the settings.
+let updateInfo=null;
+async function checkUpdate(force=false){
+    const last=+localStorage.getItem('updateCheckedAt') || 0;
+    if(!force && Date.now()-last<6*3600e3 && updateInfo)return updateInfo;
+    updateInfo=await request('update',{});
+    localStorage.setItem('updateCheckedAt',String(Date.now()));
+    return updateInfo;
+}
+async function updateDialog(){
+    beginDialog('update','Обновления');
+    const status=el('p','note','Проверяю GitHub…');modal.append(status);
+    const done=btn('Закрыть',settings,'subtle');
+    try{
+        const info=await checkUpdate(true);if(dialog!=='update')return;
+        status.textContent='Установлена версия '+info.current+'. Последняя на GitHub: '+(info.latest || 'нет выпусков')+'.';
+        if(info.newer){
+            if(info.notes)modal.append(el('p','synopsis',info.notes.slice(0,600)));
+            const go=btn('Скачать и установить '+info.latest,async()=>{
+                go.disabled=true;go.textContent='Скачиваю…';
+                try{await request('install',{url:info.url});go.textContent='Открываю установщик…';}
+                catch(e){go.disabled=false;go.textContent='Повторить';status.textContent=e.message;}
+            },'primary');
+            modal.append(go);focus(go);
+        }else{modal.append(el('p','note','У вас последняя версия.'));focus(done);}
+    }catch(e){if(dialog==='update'){status.textContent=e.message;focus(done);}}
+    modal.append(done);
+}
+function updateBanner(){
+    if(!updateInfo || !updateInfo.newer)return null;
+    const b=btn('Доступна новая версия '+updateInfo.latest+' · Обновить',updateDialog,'update-banner');return b;
+}
+function showContinue() {
+    root.replaceChildren(el('h1','page-title','Досмотреть'));
+    const continued=viewings.filter(it=>!it.finished);
+    if(!continued.length){root.append(note('Пока нечего досматривать','Начните фильм или серию, и они появятся здесь с местом, где вы остановились.'));return;}
+    root.append(continueGrid(continued),el('p','note section','Чтобы убрать что-то из списка, откройте карточку и нажмите «Убрать из „Досмотреть“».'));
+    settleFocus();
+}
 function showLibrary() {
-    root.replaceChildren(el('h1','','Моя коллекция'));
+    root.replaceChildren(profileCard());
     const continued=viewings.filter(it=>!it.finished);
     if(continued.length) {
-        root.append(el('h2','shelf titleline','Продолжить просмотр'),continueGrid(continued));
+        root.append(el('h2','shelf titleline','Досмотреть'),continueGrid(continued));
     }
     root.append(el('h2','shelf titleline','Избранное'));
     if(favorites.length)root.append(grid(favorites));
@@ -301,6 +367,13 @@ function showDetail(moveFocus=false) {
             }));
         }
     }
+    const resume=viewings.find(x=>!x.finished && (x.page===d.page || (x.item && x.item.url===item.url)));
+    if(resume){
+        const drop=btn('Убрать из «Досмотреть»',()=>{
+            Cinema.forgetViewing(resume.page);viewings=viewings.filter(x=>x!==resume);showDetail();focus(root.querySelector('[data-star]'));
+        });
+        actions.append(drop);
+    }
     const favorite=favorites.some(x=>x.url===item.url);
     const star=btn(favorite?'✓ В избранном':'+ В избранное',()=>{
         favorites=favorite?favorites.filter(x=>x.url!==item.url):[item,...favorites];
@@ -339,6 +412,38 @@ function closeDialog(){
 }
 function applyMode(value) {
     mode=value;localStorage.setItem('mode',value);document.body.classList.toggle('tv',value==='tv');Cinema.layout(value==='tv');
+    applyTiles();
+}
+// Tile layout chosen in the settings: posters per row (0 = automatic) and size of the captions.
+function tileSettings(){const t=readJson(localStorage.getItem('tiles'),'{}');return {cols:+t.cols||0,size:['s','m','l'].includes(t.size)?t.size:'m'};}
+const tileSizes={s:'Компактные',m:'Обычные',l:'Крупные'};
+function tileLabel(){const t=tileSettings();return (t.cols?t.cols+' в ряду':'авто')+' · '+tileSizes[t.size].toLowerCase();}
+function applyTiles(){
+    const t=tileSettings(), body=document.body;
+    body.classList.toggle('cols-fixed',!!t.cols);
+    if(t.cols)body.style.setProperty('--cols',t.cols);else body.style.removeProperty('--cols');
+    for(const s of ['s','m','l'])body.classList.toggle('tiles-'+s,t.size===s);
+}
+function tilesDialog(focusKey=''){
+    beginDialog('tiles','Плитки');
+    const t=tileSettings();
+    function choose(change){localStorage.setItem('tiles',JSON.stringify({...tileSettings(),...change}));applyTiles();}
+    modal.append(el('h3','section','Сколько в ряду'));
+    const counts=el('div','wrap');
+    const options=mode==='tv'?[0,4,5,6,7,8,9]:[0,2,3,4,5];
+    for(const n of options){
+        const b=btn(n?String(n):'Авто',()=>{choose({cols:n});tilesDialog('c'+n);},'chip'+(t.cols===n?' active':''));
+        b.dataset.key='c'+n;b.setAttribute('aria-pressed',String(t.cols===n));counts.append(b);
+    }
+    modal.append(counts,el('h3','section','Размер'));
+    const sizes=el('div','wrap');
+    for(const s of ['s','m','l']){
+        const b=btn(tileSizes[s],()=>{choose({size:s});tilesDialog('s'+s);},'chip'+(t.size===s?' active':''));
+        b.dataset.key='s'+s;b.setAttribute('aria-pressed',String(t.size===s));sizes.append(b);
+    }
+    modal.append(sizes,btn('Готово',settings,'subtle section'));
+    focus(modal.querySelector('[data-key="'+(focusKey || 'c'+t.cols)+'"]'));
+    if(tab==='home' && !currentItem)showHome();else if(tab==='library' && !currentItem)showLibrary();
 }
 function modePicker(first) {
     beginDialog(first?'first':'mode','Как будете смотреть?');
@@ -353,6 +458,7 @@ function back() {
     if(dialog==='torrent-list'){otherSites();return true;}
     if(dialog==='mode'){settings();return true;}
     if(dialog==='manage-sites'){finishSiteSettings();return true;}
+    if(dialog==='tiles' || dialog==='update'){settings();return true;}
     if(dialog){closeDialog();return true;}
     if(currentItem){
         const url=currentItem.url,scroll=returnScroll;currentItem=null;detail=null;navigate(tab);
@@ -381,6 +487,19 @@ function moveFocus(key){
     else if(key==='ArrowRight' && menuOpen)closeMenu();
     return true;
 }
+// Touch: swipe right from the left part of the screen opens the menu, swipe left closes it.
+let swipe=null;
+document.addEventListener('touchstart',e=>{
+    const t=e.touches[0];swipe=e.touches.length===1?{x:t.clientX,y:t.clientY,at:Date.now()}:null;
+},{passive:true});
+document.addEventListener('touchend',e=>{
+    if(!swipe || dialog)return;
+    const t=e.changedTouches[0],dx=t.clientX-swipe.x,dy=t.clientY-swipe.y,fast=Date.now()-swipe.at<600;
+    const start=swipe.x;swipe=null;
+    if(!fast || Math.abs(dx)<60 || Math.abs(dy)>Math.abs(dx)*0.7)return;
+    if(!menuOpen && dx>0 && start<window.innerWidth*0.18)openMenu();
+    else if(menuOpen && dx<0)closeMenu();
+},{passive:true});
 document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();back();return;}
     if(!e.key.startsWith('Arrow'))return;
@@ -390,3 +509,4 @@ document.addEventListener('keydown',e=>{
 });
 if(mode==='tv'||mode==='mobile'){applyMode(mode);navigate('home');if(mode==='tv')focus(entry());}
 else modePicker(true);
+setTimeout(()=>checkUpdate().then(info=>{if(info.newer && tab==='home' && category==='Все' && !currentItem && !dialog)showHome();}).catch(()=>{}),4000);

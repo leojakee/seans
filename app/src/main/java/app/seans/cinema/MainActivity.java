@@ -134,6 +134,8 @@ public class MainActivity extends Activity {
                     else if (method.equals("collaps")) result = PlaybackSources.collaps(a);
                     else if (method.equals("vibix")) result = PlaybackSources.vibix(a);
                     else if (method.equals("torrents")) result = PlaybackSources.torrents(a);
+                    else if (method.equals("update")) result = Updater.check(MainActivity.this);
+                    else if (method.equals("install")) { Updater.install(MainActivity.this,a.getString("url")); result = new JSONObject().put("ok",true); }
                     else result = Catalog.list(a.optString("mirror",mirror()),a.optString("page"),a.optString("query"));
                 } catch (Exception e) {
                     if (e instanceof org.jsoup.HttpStatusException)
