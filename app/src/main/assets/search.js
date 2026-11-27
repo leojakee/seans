@@ -105,8 +105,8 @@ function startSearch(raw,forceExact=false) {
     query=raw.trim();searchDraft=query;
     const kinopoisk=kinopoiskPath(query), direct=catalogLink(query);
     if(query && !kinopoisk && !direct){
-        const recent=readJson(localStorage.getItem('recentSearches'),'[]');
-        localStorage.setItem('recentSearches',JSON.stringify([query,...recent.filter(q=>q!==query)].slice(0,5)));
+        const recent=readJson(localStorage.getItem(storeKey('recentSearches')),'[]');
+        localStorage.setItem(storeKey('recentSearches'),JSON.stringify([query,...recent.filter(q=>q!==query)].slice(0,5)));
     }
     let sites=kinopoisk && forceExact ? ['https://rukino.ru'] : searchFilters.site ? [searchFilters.site] : searchSites();
     if(kinopoisk)sites=sites.filter(site=>site==='https://rukino.ru');
@@ -126,7 +126,7 @@ function renderSearchResults() {
     out.replaceChildren();
     const invalid=yearError();if(invalid){out.append(el('p','note',invalid));return;}
     if(!results){
-        const recent=readJson(localStorage.getItem('recentSearches'),'[]');
+        const recent=readJson(localStorage.getItem(storeKey('recentSearches')),'[]');
         if(recent.length){
             out.append(el('h3','section','Недавние запросы'));const row=el('div','wrap');out.append(row);
             recent.forEach(term=>row.append(btn(term,()=>{$('title-query').value=term;startSearch(term);},'chip')));
@@ -181,6 +181,13 @@ function renderSearchResults() {
         target.focus({preventScroll:true});if(mode==='tv')reveal(target);
     }
 }
+// Speech recognised by the system (remote microphone or phone): search for it right away.
+function voiceResult(text){
+    text=String(text || '').trim();if(!text)return;
+    if(tab!=='search' || currentItem)navigate('search');
+    searchDraft=text;const input=$('title-query');if(input)input.value=text;
+    startSearch(text);
+}
 function showSearch() {
     root.replaceChildren(el('h1','','Поиск'));
     const fields=[
@@ -191,6 +198,7 @@ function showSearch() {
         {key:'site',label:'Где искать',choices:[['','Все сайты'],...searchSites().map(url=>[url,sourceName(url)])]}
     ];
     const form=SeansUI.search({tv:mode==='tv',draft:searchDraft,initial:{...searchFilters},open:filtersOpen,fields,count:filterCount,
+        voice:Cinema.canVoiceSearch()?()=>Cinema.voiceSearch():null,
         onDraft:value=>{searchDraft=value;},onSubmit:startSearch,onToggle:open=>{filtersOpen=open;},
         onChange:(key,value)=>{
             searchFilters[key]=value;

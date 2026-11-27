@@ -13,7 +13,14 @@ let serial=0, version=0, tab='home', category='Все', mirror=Cinema.mirror();
 let mode=localStorage.getItem('mode') || '', dialog='', priorFocus=null;
 let home=null, results=null, query='', section=null, detail=null, selected=0, seasons=[], episodes=[];
 let currentItem=null, returnScroll=0, titleButton=null, sectionPage='', activeEpisode='';
-let favorites=readJson(localStorage.getItem('favorites'),'[]'), viewings=readJson(Cinema.history(),'[]');
+// Profiles: favourites, searches and history belong to the active profile; the first profile keeps the old keys.
+function activeProfile(){return localStorage.getItem('activeProfile') || 'main';}
+function storeKey(name){const id=activeProfile();return id==='main'?name:name+'@'+id;}
+function profiles(){const list=readJson(localStorage.getItem('profiles'),'[]');return list.length?list:[{id:'main',name:localStorage.getItem('profileName') || 'Зритель'}];}
+Cinema.setProfile(activeProfile());
+let favorites=readJson(localStorage.getItem(storeKey('favorites')),'[]'), viewings=readJson(Cinema.history(),'[]');
+function saveFavorites(){localStorage.setItem(storeKey('favorites'),JSON.stringify(favorites));Cinema.syncFavorites(JSON.stringify(favorites));}
+Cinema.syncFavorites(JSON.stringify(favorites));
 function readJson(raw,fallback) { try {return JSON.parse(raw || fallback);} catch (_) {return JSON.parse(fallback);} }
 function request(method,args) {
     const id=++serial;
@@ -106,9 +113,15 @@ async function categoryData(name){
 async function showHome() {
     const token=++version;
     root.replaceChildren();
-    if(!home){root.append(note('Открываю каталог…',new URL(mirror).hostname));
-        try {const data=await catalogWithFallback(token);if(token!==version)return;home=data;}
-        catch(e){if(token===version){root.replaceChildren();failure(e,showHome);}return;}
+    if(!home){
+        // Start from the catalogue saved last time, then refresh it quietly; skeleton cards while nothing is known.
+        const cached=readJson(localStorage.getItem('homeCache'),'null');
+        if(cached && cached.root===mirror && Array.isArray(cached.items) && cached.items.length){home=cached;refreshHome();}
+        else{
+            root.append(skeleton());
+            try {const data=await catalogWithFallback(token);if(token!==version)return;home=data;cacheHome(data);}
+            catch(e){if(token===version){root.replaceChildren();failure(e,showHome);}return;}
+        }
     }
     if(token!==version)return;
     root.replaceChildren();
@@ -136,6 +149,25 @@ function showShelves(token){
     root.append(feedShelf('Фильмы','Фильмы со всех источников'),feedShelf('Сериалы','Сериалы со всех источников'));
     if(favorites.length)root.append(shelf('Избранное',grid(favorites.slice(0,16))));
     settleFocus();
+}
+function skeleton(){
+    const box=el('div','skeleton');
+    for(let s=0;s<2;s++){
+        box.append(el('div','sk-title'));const row=el('div','sk-row');
+        for(let i=0;i<8;i++){const c=el('div','sk-card');c.append(el('div','sk-art'),el('div','sk-line'),el('div','sk-line short'));row.append(c);}
+        box.append(row);
+    }
+    return box;
+}
+function cacheHome(data){
+    try{localStorage.setItem('homeCache',JSON.stringify({root:data.root,items:data.items.slice(0,40),categories:data.categories||{},next:data.next||''}));}catch(_){}
+}
+async function refreshHome(){
+    try{
+        const data=await request('list',{mirror});
+        acceptCatalog(data);home=data;cacheHome(data);
+        if(tab==='home' && category==='Все' && !currentItem && !dialog && !menuOpen && !root.contains(document.activeElement))showHome();
+    }catch(_){} // The saved catalogue stays on screen; the next start tries again.
 }
 async function selectCategory(value) {
     if(value===category)return;
@@ -172,26 +204,91 @@ function continueGrid(list) {
         progress:h.duration>0?h.position/h.duration:0,open:button=>openItem(h.item,h.page,button)
     })));
 }
-// Local profile: everything below lives on this device only (localStorage and the app's own preferences).
-function profileName(){return (localStorage.getItem('profileName') || '').trim();}
+// Local profiles: everything below lives on this device only (localStorage and the app's own preferences).
+function saveProfiles(list){localStorage.setItem('profiles',JSON.stringify(list));}
+function profileName(){const p=profiles().find(x=>x.id===activeProfile());return p?p.name:'Зритель';}
 function profileCard(){
     const card=el('section','profile');
-    const name=profileName() || 'Зритель';
+    const name=profileName();
     const avatar=el('div','avatar',name.slice(0,1).toUpperCase());
     const info=el('div','profile-info');
     const watched=viewings.length, finished=viewings.filter(v=>v.finished).length;
     const minutes=Math.round(viewings.reduce((sum,v)=>sum+(v.finished?(v.duration||v.position||0):(v.position||0)),0)/60000);
     info.append(el('h1','',name),el('p','note','Открыто: '+watched+' · Досмотрено: '+finished+' · В избранном: '+favorites.length+' · Просмотрено ≈ '+(minutes>=60?Math.floor(minutes/60)+' ч '+minutes%60+' мин':minutes+' мин')));
     const actions=el('div','wrap actions');
-    actions.append(btn('Изменить имя',renameProfile),btn('Очистить историю',clearHistoryDialog));
+    actions.append(btn('Профили · '+profiles().length,profilesDialog),btn('Изменить имя',renameProfile),
+        btn('Экспорт избранного',exportFavorites),btn('Импорт',importDialog),btn('Очистить историю',clearHistoryDialog));
     info.append(actions);card.append(avatar,info);return card;
 }
 function renameProfile(){
     beginDialog('profile','Как вас зовут?');
     const input=el('input','address');input.value=profileName();input.maxLength=40;input.setAttribute('aria-label','Имя');
-    const save=btn('Сохранить',()=>{localStorage.setItem('profileName',input.value.trim());closeDialog();showLibrary();},'primary');
+    const save=btn('Сохранить',()=>{
+        const name=input.value.trim() || 'Зритель';
+        saveProfiles(profiles().map(p=>p.id===activeProfile()?{...p,name}:p));closeDialog();showLibrary();
+    },'primary');
     input.onkeydown=e=>{if(e.key==='Enter')save.click();};
     modal.append(el('p','note','Имя хранится только на этом устройстве.'),input,save,btn('Отмена',closeDialog,'subtle'));focus(input);
+}
+function switchProfile(id){
+    localStorage.setItem('activeProfile',id);Cinema.setProfile(id);
+    favorites=readJson(localStorage.getItem(storeKey('favorites')),'[]');viewings=readJson(Cinema.history(),'[]');
+    Cinema.syncFavorites(JSON.stringify(favorites));results=null;query='';searchDraft='';
+    closeDialog();navigate('library');
+}
+function profilesDialog(){
+    beginDialog('profiles','Профили');
+    const list=profiles();
+    for(const p of list){
+        const b=btn('',()=>switchProfile(p.id),'option');
+        b.append(el('strong','',(p.id===activeProfile()?'✓ ':'')+p.name),el('span','',p.id===activeProfile()?'Текущий профиль':'Переключиться'));
+        modal.append(b);
+    }
+    const add=btn('+ Новый профиль',()=>{
+        beginDialog('profiles','Новый профиль');
+        const input=el('input','address');input.maxLength=40;input.placeholder='Имя';input.setAttribute('aria-label','Имя профиля');
+        const create=btn('Создать',()=>{
+            const name=input.value.trim();if(!name){input.focus();return;}
+            const id='p'+Date.now().toString(36);
+            saveProfiles([...profiles(),{id,name}]);switchProfile(id);
+        },'primary');
+        input.onkeydown=e=>{if(e.key==='Enter')create.click();};
+        modal.append(el('p','note','У профиля своё избранное, история и «Досмотреть».'),input,create,btn('Назад',profilesDialog,'subtle'));focus(input);
+    },'secondary section');
+    modal.append(add);
+    if(activeProfile()!=='main'){
+        modal.append(btn('Удалить этот профиль',()=>{
+            const id=activeProfile();Cinema.clearHistory();
+            localStorage.removeItem('favorites@'+id);localStorage.removeItem('recentSearches@'+id);
+            saveProfiles(profiles().filter(p=>p.id!==id));switchProfile('main');
+        },'subtle section'));
+    }
+    modal.append(btn('Закрыть',closeDialog,'subtle'));focus(modal.querySelector('.option'));
+}
+// Favourites move between devices as a small JSON file: share it, then import it on the other device.
+function exportFavorites(){
+    const data=JSON.stringify({app:'seans',kind:'favorites',profile:profileName(),items:favorites},null,1);
+    Cinema.shareText('Сеанс — избранное',data);
+}
+function importDialog(){
+    beginDialog('import','Импорт избранного');
+    const area=el('textarea','address import-text');area.rows=5;area.placeholder='Вставьте сюда экспортированный текст';
+    const status=el('p','note','Выберите файл, который сохранили через «Экспорт», или вставьте его текст.');
+    const pick=btn('Выбрать файл',()=>Cinema.pickImport(),'secondary');
+    const add=btn('Добавить в избранное',()=>importResult(area.value,''),'primary');
+    modal.append(status,pick,area,add,btn('Закрыть',closeDialog,'subtle'));focus(pick);
+}
+function importResult(text,error){
+    const status=modal.querySelector('.note');
+    if(error){if(status)status.textContent=error;return;}
+    let items;
+    try{const data=JSON.parse(text);items=Array.isArray(data)?data:data.items;}catch(_){items=null;}
+    if(!Array.isArray(items)){if(status)status.textContent='Это не похоже на экспорт избранного «Сеанса».';return;}
+    const known=new Set(favorites.map(f=>f.url));
+    const added=items.filter(i=>i && typeof i.url==='string' && i.url.startsWith('https://') && typeof i.title==='string' && !known.has(i.url));
+    favorites=[...favorites,...added];saveFavorites();
+    closeDialog();showLibrary();
+    root.prepend(note('Импорт готов','Добавлено: '+added.length+(items.length>added.length?' · уже были: '+(items.length-added.length):'')));
 }
 function clearHistoryDialog(){
     beginDialog('profile','Очистить историю?');
@@ -229,6 +326,13 @@ async function updateDialog(){
 function updateBanner(){
     if(!updateInfo || !updateInfo.newer)return null;
     const b=btn('Доступна новая версия '+updateInfo.latest+' · Обновить',updateDialog,'update-banner');return b;
+}
+// Opened from the Android TV "Play next" row: go straight to that title.
+function openLaunch(){
+    const raw=Cinema.takeLaunch();if(!raw)return;
+    const launch=readJson(raw,'null');if(!launch || !launch.item)return;
+    closeMenu(false);if(dialog && dialog!=='first')closeDialog();
+    openItem(launch.item,launch.page,null);
 }
 function showContinue() {
     root.replaceChildren(el('h1','page-title','Досмотреть'));
@@ -295,7 +399,31 @@ async function openItem(item,page,from,hint=null) {
     }catch(e){if(token===version){root.replaceChildren(btn('‹ Назад',back,'subtle back'));
         root.append(note('Не удалось открыть карточку',e.message,otherSites,'Другие источники'),btn('Повторить',()=>openItem(item,page,from,hint)));}}
 }
-async function selectPart(part,isSeason) {
+// Episode chips show what was watched: ✓ finished, • started.
+function markWatched(list){
+    return list.map(ep=>{
+        const seen=viewings.find(v=>v.page===ep.url);
+        if(!seen)return ep;
+        return Object.assign({},ep,{label:(seen.finished?'✓ ':'• ')+ep.label});
+    });
+}
+// Called by the player when an episode ends and the countdown runs out: open the next episode with the same voice-over.
+async function playNextEpisode(){
+    if(!currentItem || !episodes.length)return;
+    let index=episodes.findIndex(ep=>ep.url===activeEpisode);
+    let next=episodes[index+1];
+    if(!next){
+        const s=seasons.findIndex(x=>x.url===sectionPage);
+        const season=seasons[s+1];
+        if(!season)return;
+        await selectPart(season,true,{quiet:true});
+        next=episodes[0];
+        if(!next)return;
+    }
+    await selectPart(next,false,{quiet:true});
+    if(seriesContext())playSeries(false);
+}
+async function selectPart(part,isSeason,options={}) {
     const token=++version;
     const status=el('p','note','Загружаю…');root.prepend(status);
     try{
@@ -306,7 +434,7 @@ async function selectPart(part,isSeason) {
         showDetail(!isSeason);
         if(isSeason)focus(root.querySelector('[data-episode]'));
         // Season, then episode, then voice-over: picking an episode opens the voice-over list from every source.
-        else if(seriesContext())otherSites();
+        else if(seriesContext() && !options.quiet)otherSites();
     }catch(e){if(token===version)status.textContent=e.message;}
 }
 function showDetail(moveFocus=false) {
@@ -379,13 +507,13 @@ function showDetail(moveFocus=false) {
     const favorite=favorites.some(x=>x.url===item.url);
     const star=btn(favorite?'✓ В избранном':'+ В избранное',()=>{
         favorites=favorite?favorites.filter(x=>x.url!==item.url):[item,...favorites];
-        localStorage.setItem('favorites',JSON.stringify(favorites));showDetail();focus(root.querySelector('[data-star]'));
+        saveFavorites();showDetail();focus(root.querySelector('[data-star]'));
     });star.dataset.star='';actions.append(star);
     if(seasons.length) {
         body.append(el('h3','section','Сезоны'),SeansUI.parts(seasons,sectionPage,true,selectPart));
     }
     if(episodes.length){
-        body.append(el('h3','section','Серии'),SeansUI.parts(episodes,activeEpisode,false,selectPart));
+        body.append(el('h3','section','Серии'),SeansUI.parts(markWatched(episodes),activeEpisode,false,selectPart));
     }
     if(activeEpisode)body.append(el('p','section',d.title));
     if(!series && d.players.length>1 && selectable){
@@ -460,7 +588,7 @@ function back() {
     if(dialog==='torrent-list'){otherSites();return true;}
     if(dialog==='mode'){settings();return true;}
     if(dialog==='manage-sites'){finishSiteSettings();return true;}
-    if(dialog==='tiles' || dialog==='update'){settings();return true;}
+    if(dialog==='tiles' || dialog==='update' || dialog==='alerts'){settings();return true;}
     if(dialog){closeDialog();return true;}
     if(currentItem){
         const url=currentItem.url,scroll=returnScroll;currentItem=null;detail=null;navigate(tab);
@@ -473,7 +601,7 @@ function back() {
 }
 function moveFocus(key){
     const scope=dialog?modal:menuOpen?$('sidemenu'):document;
-    const nodes=[...scope.querySelectorAll('button,input,select')].filter(n=>!n.disabled && !n.closest('[inert]') && n.getClientRects().length);
+    const nodes=[...scope.querySelectorAll('button,input,select,textarea')].filter(n=>!n.disabled && !n.closest('[inert]') && n.getClientRects().length);
     const current=document.activeElement;if(!nodes.includes(current)){if(nodes[0])nodes[0].focus();return true;}
     const r=current.getBoundingClientRect(),vertical=key==='ArrowDown'||key==='ArrowUp',sign=(key==='ArrowRight'||key==='ArrowDown')?1:-1;
     const pos=(b,axis)=>axis?(b.top+b.bottom)/2:(b.left+b.right)/2;
@@ -506,9 +634,10 @@ document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();back();return;}
     if(!e.key.startsWith('Arrow'))return;
     followFirstResult=false;
-    if(e.target.tagName==='INPUT' && !e.target.readOnly && e.target.type!=='checkbox' && ['ArrowLeft','ArrowRight'].includes(e.key))return;
+    if((e.target.tagName==='INPUT' || e.target.tagName==='TEXTAREA') && !e.target.readOnly && e.target.type!=='checkbox' && ['ArrowLeft','ArrowRight'].includes(e.key))return;
     e.preventDefault();moveFocus(e.key);
 });
 if(mode==='tv'||mode==='mobile'){applyMode(mode);navigate('home');if(mode==='tv')focus(entry());}
 else modePicker(true);
 setTimeout(()=>checkUpdate().then(info=>{if(info.newer && tab==='home' && category==='Все' && !currentItem && !dialog)showHome();}).catch(()=>{}),4000);
+setTimeout(openLaunch,300);

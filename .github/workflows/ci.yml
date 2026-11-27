@@ -1,0 +1,26 @@
+# Every pull request and push to main: unit tests for the page logic and a debug build of the APK.
+name: Check
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Page tests
+        run: node --test tests/series-source.cjs tests/web-quality.cjs
+      - name: Page scripts parse
+        run: for f in app/src/main/assets/*.js; do node --check "$f"; done
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Debug build
+        run: |
+          chmod +x gradlew
+          ./gradlew -PparallelInstall :app:assembleDebug

@@ -20,8 +20,8 @@ android {
         resValue 'string', 'app_name', providers.gradleProperty('parallelInstall').isPresent() ? 'Сеанс Кино' : 'Сеанс'
         minSdk 26
         targetSdk 35
-        versionCode 12
-        versionName '1.9.2'
+        versionCode 13
+        versionName '2.0'
     }
     signingConfigs {
         release {
@@ -47,6 +47,8 @@ android {
 
 dependencies {
     implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.tvprovider:tvprovider:1.0.0'
+    implementation 'androidx.work:work-runtime:2.9.1'
     implementation 'org.jsoup:jsoup:1.18.3'
     implementation 'androidx.media3:media3-exoplayer:1.5.1'
     implementation 'androidx.media3:media3-exoplayer-hls:1.5.1'

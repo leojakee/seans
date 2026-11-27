@@ -25,6 +25,7 @@ import HomeIcon from '@mui/icons-material/HomeOutlined';
 import SeriesIcon from '@mui/icons-material/LiveTvOutlined';
 import ListIcon from '@mui/icons-material/ViewModuleOutlined';
 import ResumeIcon from '@mui/icons-material/HistoryRounded';
+import MicIcon from '@mui/icons-material/MicRounded';
 
 const cache=createCache({key:'seans',nonce:document.querySelector('meta[name=style-nonce]').content,prepend:true});
 const theme=createTheme({
@@ -159,7 +160,7 @@ function EntryField({tv,htmlInput,...props}){
             }}
     }}/>;
 }
-function SearchForm({tv,draft,initial,open,fields,onDraft,onSubmit,onToggle,onChange,onReset,count}){
+function SearchForm({tv,draft,initial,open,fields,onDraft,onSubmit,onToggle,onChange,onReset,count,voice}){
     const [expanded,setExpanded]=useState(open);
     const [filters,setFilters]=useState(initial);
     function update(key,value){
@@ -169,6 +170,7 @@ function SearchForm({tv,draft,initial,open,fields,onDraft,onSubmit,onToggle,onCh
         <form className="mui-search-form" onSubmit={e=>{e.preventDefault();onSubmit(e.currentTarget.elements.query.value);}}>
             <EntryField tv={tv} fullWidth name="query" id="title-query" label="Название или ссылка" type="search" defaultValue={draft}
                 onChange={e=>onDraft(e.target.value)} htmlInput={{enterKeyHint:'search',autoComplete:'off'}}/>
+            {voice && <IconButton className="voice-button" aria-label="Голосовой поиск" onClick={voice}><MicIcon/></IconButton>}
             <Button type="submit" variant="contained" startIcon={<SearchIcon/>}>Найти</Button>
         </form>
         <Button id="search-filter-toggle" variant={expanded?'contained':'outlined'} startIcon={<TuneIcon/>}
