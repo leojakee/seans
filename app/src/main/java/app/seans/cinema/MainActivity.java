@@ -2,9 +2,13 @@ package app.seans.cinema;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -15,6 +19,7 @@ import android.view.WindowInsetsController;
 import android.view.WindowInsets;
 import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -22,6 +27,7 @@ import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
     private static final String BASE = "https://appassets.androidplatform.net/";
+    private static final int TORRSERVE_INSTALL_PERMISSION = 46;
     private static final Set<String> FILES = new java.util.HashSet<>(java.util.Arrays.asList("index.html","screen.css","material.js","sources.js","playback.js","search.js","feed.js","cinema.js"));
     private final ExecutorService network = Executors.newFixedThreadPool(8);
     private final ExecutorService details = Executors.newFixedThreadPool(2);
@@ -224,17 +230,54 @@ public class MainActivity extends Activity {
                         return;
                     }
                 } catch (android.content.ActivityNotFoundException ignored) { }
-                new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Нужен торрент-клиент")
-                        .setMessage("Откройте magnet-ссылку в приложении с поддержкой торрентов.")
-                        .setPositiveButton("Скопировать ссылку",(dialog,which)->{
-                            android.content.ClipboardManager clipboard=getSystemService(android.content.ClipboardManager.class);
-                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Magnet",magnet));
-                        }).setNegativeButton("Назад",null).show();
+                new AlertDialog.Builder(MainActivity.this).setTitle("Нужен торрент-клиент")
+                        .setMessage("Установите TorrServe MatriX для просмотра раздач.")
+                        .setPositiveButton("Скачать TorrServe",(dialog,which)->downloadTorrServe())
+                        .setNegativeButton("Назад",null).show();
             });
+        }
+    }
+    private File torrServeApk;
+    private void downloadTorrServe() {
+        AlertDialog progress=new AlertDialog.Builder(this).setTitle("TorrServe MatriX")
+                .setMessage("Скачиваю APK…").setCancelable(false).show();
+        network.execute(()->{
+            try {
+                File file=Updater.downloadTorrServe(this);
+                runOnUiThread(()->{
+                    if(isFinishing() || isDestroyed())return;
+                    progress.dismiss();
+                    torrServeApk=file;
+                    installTorrServe();
+                });
+            } catch (Exception e) {
+                runOnUiThread(()->{
+                    if(isFinishing() || isDestroyed())return;
+                    progress.dismiss();
+                    new AlertDialog.Builder(this).setTitle("Не удалось скачать TorrServe")
+                            .setMessage(e.getMessage())
+                            .setPositiveButton("Повторить",(dialog,which)->downloadTorrServe())
+                            .setNegativeButton("Назад",null).show();
+                });
+            }
+        });
+    }
+    private void installTorrServe() {
+        try {
+            if(getPackageManager().canRequestPackageInstalls())Updater.openInstaller(this,torrServeApk);
+            else startActivityForResult(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:"+getPackageName())),TORRSERVE_INSTALL_PERMISSION);
+        } catch (ActivityNotFoundException e) {
+            new AlertDialog.Builder(this).setTitle("Не удалось открыть установщик")
+                    .setPositiveButton("Закрыть",null).show();
         }
     }
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data) {
         super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode==TORRSERVE_INSTALL_PERMISSION){
+            if(torrServeApk!=null && getPackageManager().canRequestPackageInstalls())installTorrServe();
+            return;
+        }
         if (requestCode==42 && resultCode==RESULT_OK && data!=null && data.getBooleanExtra("otherSites",false))
             web.evaluateJavascript("window.otherSites && otherSites("+data.getBooleanExtra("external",false)+")",null);
         else if (requestCode==43 && resultCode==RESULT_OK && data!=null) {

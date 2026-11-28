@@ -100,7 +100,9 @@ function showFeed(category,token){
         const answered=feed.sites.filter(s=>s.started && !s.busy).length;
         title.querySelector('.feed-state').textContent='Источников: '+answered+' из '+feed.sites.length+' · Найдено: '+groups.length;
         if(groups.length!==shown){shown=groups.length;SeansUI.updateGrid(host,feedEntries(groups));}
-        marker.textContent=feedDone(feed)?(groups.length?'Это всё, что нашлось.':'Ничего не нашлось. Проверьте источники в настройках.'):'Загружаю…';
+        const done=feedDone(feed);
+        if(done)marker.textContent=groups.length?'Это всё, что нашлось.':'Ничего не нашлось. Проверьте источники в настройках.';
+        else if(!marker.firstElementChild)marker.replaceChildren(skeleton(1));
         settleFocus();
     }
     feed.listeners.add(render);
@@ -115,6 +117,7 @@ function feedShelf(category,title){
     const feed=feedFor(category);
     const host=SeansUI.grid([]);
     const block=shelf(title,host,category);
+    const loading=skeleton(1);host.after(loading);
     let shown=0, attached=false;
     function render(){
         // Sites can answer before the shelf is on the page: only a shelf that was shown and then removed stops listening.
@@ -122,7 +125,9 @@ function feedShelf(category,title){
         attached=true;
         const groups=feedGroups(feed).slice(0,24);
         if(groups.length!==shown){shown=groups.length;SeansUI.updateGrid(host,feedEntries(groups));settleFocus();}
-        block.hidden=!groups.length;
+        loading.hidden=groups.length>0 || feedDone(feed);
+        host.hidden=!groups.length;
+        block.hidden=!groups.length && feedDone(feed);
     }
     feed.listeners.add(render);
     if(!feed.sites.some(s=>s.started))feedMore(feed);
