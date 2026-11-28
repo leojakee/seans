@@ -9,9 +9,10 @@ if (!Element.prototype.replaceChildren) {
 const $ = id => document.getElementById(id);
 const root = $('content'), veil = $('veil'), modal = $('modal');
 const pending = new Map(), detailCache = new Map();
+const movieMetadata = new Map();
 let serial=0, version=0, tab='home', category='Все', mirror=Cinema.mirror();
 let mode=localStorage.getItem('mode') || '', dialog='', priorFocus=null;
-let home=null, results=null, query='', section=null, detail=null, selected=0, seasons=[], episodes=[];
+let home=null, results=null, query='', detail=null, selected=0, seasons=[], episodes=[];
 let currentItem=null, returnScroll=0, titleButton=null, sectionPage='', activeEpisode='';
 // Profiles: favourites, searches and history belong to the active profile; the first profile keeps the old keys.
 function activeProfile(){return localStorage.getItem('activeProfile') || 'main';}
@@ -53,20 +54,20 @@ function note(title,message,action,label='Повторить') {
 function failure(error,retry) {
     root.append(note('Не удалось загрузить',error.message,retry),btn('Настройки зеркала',settings,'subtle'));
 }
-const sectionTitles={home:'Главная',catalog:'Каталог',movies:'Фильмы',series:'Сериалы',continue:'Досмотреть',search:'Поиск',library:'Избранное'};
 const categorySections={'Все':'home','Каталог':'catalog','Фильмы':'movies','Сериалы':'series'};
 function currentSection(){return tab==='home'?categorySections[category]:tab;}
-function drawChrome(){const s=currentSection();SeansUI.selectTab(tab,s,sectionTitles[s],mode==='tv');}
+function drawChrome(){SeansUI.selectTab(tab,currentSection(),mode==='tv');}
 function setTab(value) {
     tab=value;detail=null;currentItem=null;++version;
     drawChrome();
     window.scrollTo(0,0);
 }
-// Side menu, as in TV media centres: opens with the menu button or the left arrow at the left edge.
+// The phone opens its menu from Home. On TV the left arrow opens the drawer.
 let menuOpen=false, menuReturn=null;
 function openMenu(){
     if(menuOpen || dialog)return;
-    menuOpen=true;menuReturn=document.activeElement;SeansUI.menu(true);root.inert=true;document.body.classList.add('menu-open');
+    menuOpen=true;menuReturn=mode==='mobile'?document.querySelector('[data-tab=home]'):document.activeElement;
+    SeansUI.menu(true);root.inert=true;document.body.classList.add('menu-open');
     focus(document.querySelector('#sidemenu .on') || document.querySelector('#sidemenu button'));
 }
 function closeMenu(restore=true){
@@ -76,6 +77,10 @@ function closeMenu(restore=true){
     menuReturn=null;
 }
 function toggleMenu(){if(menuOpen)closeMenu();else openMenu();}
+function homeNavigation(){
+    if(menuOpen || (tab==='home' && category==='Все' && !currentItem)){toggleMenu();return;}
+    openSection('home');
+}
 function entry(){
     // Where focus lands after switching sections: the first card, else the first control of the page.
     return root.querySelector('.card') || root.querySelector('button:not(.back),input') || document.querySelector('[data-tab].on');
@@ -87,8 +92,8 @@ function openSection(id){
     if(id==='search' || id==='library' || id==='continue'){navigate(id);}
     else{
         const next=Object.keys(categorySections).find(c=>categorySections[c]===id) || 'Все';
-        if(tab!=='home' || currentItem){category='Все';section=null;navigate('home');}
-        if(next!=='Все')selectCategory(next);else if(category!=='Все'){category='Все';section=null;showHome();drawChrome();}
+        if(tab!=='home' || currentItem){category='Все';navigate('home');}
+        if(next!=='Все')selectCategory(next);else if(category!=='Все'){category='Все';showHome();drawChrome();}
     }
     if(mode==='tv')setTimeout(()=>focus(entry()),60);
 }
@@ -104,16 +109,10 @@ async function getDetail(url) {
     if(detailCache.size>=40)detailCache.delete(detailCache.keys().next().value);
     detailCache.set(url,data);return data;
 }
-const sectionCache=new Map();
-async function categoryData(name){
-    // 'Каталог' is the catalogue's own first page; films and series have pages of their own on most sites.
-    if(name==='Каталог' || !home.categories[name])return home;
-    if(!sectionCache.has(name))sectionCache.set(name,await request('list',{mirror:home.root,page:home.categories[name]}));
-    return sectionCache.get(name);
-}
 async function showHome() {
     const token=++version;
     root.replaceChildren();
+    if(category!=='Все'){showFeed(category,token);return;}
     if(!home){
         // Start from the catalogue saved last time, then refresh it quietly; skeleton cards while nothing is known.
         const cached=readJson(localStorage.getItem('homeCache'),'null');
@@ -121,21 +120,18 @@ async function showHome() {
         else{
             root.append(skeleton());
             try {const data=await catalogWithFallback(token);if(token!==version)return;home=data;cacheHome(data);}
-            catch(e){if(token===version){root.replaceChildren();failure(e,showHome);}return;}
+            catch(e){
+                if(token===version){
+                    root.replaceChildren();
+                    if(Cinema.tmdbEnabled())showShelves(token);else failure(e,showHome);
+                }
+                return;
+            }
         }
     }
     if(token!==version)return;
     root.replaceChildren();
-    if(category==='Все'){showShelves(token);return;}
-    if(['Каталог','Фильмы','Сериалы'].includes(category)){showFeed(category,token);return;}
-    const data=section || home;
-    const kind=category==='Фильмы'?'Фильм':category==='Сериалы'?'Сериал':'';
-    const items=section || category==='Каталог' ? data.items : home.items.filter(i=>i.kind===kind);
-    root.append(el('h1','page-title',category));
-    root.append(grid(items));
-    if(!items.length)root.append(note('Пока пусто','Попробуйте поиск по названию.'));
-    if(data.next && (section || category==='Каталог'))more(data,showHome);
-    settleFocus();
+    showShelves(token);
 }
 function settleFocus(){
     // On a TV something must always be focused, or the remote seems dead.
@@ -146,13 +142,28 @@ function showShelves(token){
     const banner=updateBanner();if(banner)root.append(banner);
     const continued=viewings.filter(h=>!h.finished).slice(0,16);
     if(continued.length)root.append(shelf('Досмотреть',continueGrid(continued)));
-    const year=new Date().getFullYear();
-    const isCurrent=item=>Number(item.year)===year;
-    const recent=home.items.filter(isCurrent).concat(home.items.filter(item=>!isCurrent(item)));
-    root.append(shelf('Новое в каталоге',grid(recent.slice(0,20)),'Каталог'));
+    const recent=recentTitles(home?.items || []);
+    const showRecent=items=>shelf('Новое в каталоге',grid(items),'Каталог','Весь каталог');
+    if(Cinema.tmdbEnabled()){
+        const loading=skeleton(1);
+        root.append(loading);
+        request('tmdbNew',{}).then(data=>recentTitles(data.items)).catch(()=>[]).then(items=>{
+            if(!loading.isConnected || token!==version)return;
+            const available=items.length?items:recent;
+            if(available.length)loading.replaceWith(showRecent(available));else loading.remove();
+            settleFocus();
+        });
+    }else if(recent.length)root.append(showRecent(recent));
     root.append(feedShelf('Фильмы','Фильмы со всех источников'),feedShelf('Сериалы','Сериалы со всех источников'));
     if(favorites.length)root.append(shelf('Избранное',grid(favorites.slice(0,16))));
     settleFocus();
+}
+function recentTitles(items,year=new Date().getFullYear()){
+    return items.filter(item=>Number(item.year)===year)
+        .concat(items.filter(item=>Number(item.year)===year-1)).slice(0,20);
+}
+function tmdbTitle(url){
+    return /^https:\/\/www\.themoviedb\.org\/(movie|tv)\/([1-9]\d{0,8})$/.exec(url);
 }
 function skeleton(rows=2){
     const box=el('div','skeleton');
@@ -183,33 +194,15 @@ async function refreshHome(){
         if(tab==='home' && category==='Все' && !currentItem && !dialog && !menuOpen && !root.contains(document.activeElement))showHome();
     }catch(_){} // The saved catalogue stays on screen; the next start tries again.
 }
-async function selectCategory(value) {
+function selectCategory(value) {
     if(value===category)return;
-    category=value;section=null;drawChrome();window.scrollTo(0,0);
-    if(value==='Все' || value==='Каталог' || !home || !home.categories[value]){await showHome();return;}
-    const token=++version;root.replaceChildren(el('h1','page-title',value),skeleton(1));
-    try{const data=await categoryData(value);
-        if(token!==version)return;section=data;await showHome();
-        if(mode==='tv')focus(entry());}
-    catch(e){if(token===version){root.replaceChildren();failure(e,()=>{category='Все';selectCategory(value);});}}
+    category=value;drawChrome();window.scrollTo(0,0);
+    showHome();
 }
-function more(data,render) {
-    const b=btn('Показать ещё',async()=>{
-        const token=version; b.disabled=true;b.textContent='Загружаю…';
-        try{
-            const next=await request('list',{mirror:data.root,page:data.next,query:tab==='search'?query:''});
-            if(token!==version)return;
-            const seen=new Set(data.items.map(i=>i.url));const added=next.items.filter(i=>!seen.has(i.url));
-            data.items.push(...added);data.next=next.next!==data.next?next.next:'';
-            await render();const first=[...root.querySelectorAll('.card')].find(x=>added[0] && x.dataset.url===added[0].url);
-            if(first && mode==='tv'){first.focus();first.scrollIntoView({block:'center'});}
-        }catch(e){b.disabled=false;b.textContent='Повторить загрузку';b.title=e.message;}
-    },'secondary more');root.append(b);
-}
-function shelf(title,region,moreCategory) {
+function shelf(title,region,moreCategory,moreLabel='Ещё') {
     const block=el('section','shelf-block');region.classList.add('row');
     const head=el('div','shelf-head');head.append(el('h2','shelf-title',title));
-    if(moreCategory)head.append(btn('Ещё',()=>selectCategory(moreCategory),'more-link'));
+    if(moreCategory)head.append(btn(moreLabel,()=>selectCategory(moreCategory),'more-link'));
     block.append(head,region);return block;
 }
 function continueGrid(list) {
@@ -317,24 +310,60 @@ async function checkUpdate(force=false){
     localStorage.setItem('updateCheckedAt',String(Date.now()));
     return updateInfo;
 }
+function releaseNotes(markdown){
+    const notes=el('div','release-notes');
+    let list=null, paragraph=null;
+    function inline(node,text){
+        // Release bodies are remote text. Only create the formatting elements we support.
+        const pattern=/\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`/g;
+        let end=0;
+        for(const match of text.matchAll(pattern)){
+            node.append(document.createTextNode(text.slice(end,match.index)),
+                el(match[3]?'code':'strong','',match[1]||match[2]||match[3]));
+            end=match.index+match[0].length;
+        }
+        node.append(document.createTextNode(text.slice(end)));
+    }
+    for(const raw of markdown.split(/\r?\n/)){
+        const line=raw.trim();
+        const heading=line.match(/^#{1,6}\s+(.+)$/);
+        const bullet=line.match(/^([-+*]|\d+[.)])\s+(.+)$/);
+        if(bullet){
+            const tag=bullet[1].length===1?'ul':'ol';
+            if(list?.localName!==tag){list=el(tag);notes.append(list);}
+            const item=el('li');inline(item,bullet[2]);list.append(item);paragraph=null;
+            continue;
+        }
+        list=null;
+        if(!line || heading){
+            paragraph=null;
+            if(heading){const title=el('h3');inline(title,heading[1]);notes.append(title);}
+            continue;
+        }
+        if(!paragraph){paragraph=el('p');notes.append(paragraph);}
+        else paragraph.append(document.createTextNode(' '));
+        inline(paragraph,line);
+    }
+    return notes;
+}
 async function updateDialog(){
     beginDialog('update','Обновления');
     const status=el('p','note','Проверяю GitHub…');modal.append(status);
-    const done=btn('Закрыть',settings,'subtle');
+    const done=btn('Закрыть',settings,'subtle'), actions=el('div','wrap update-actions');
+    actions.append(done);modal.append(actions);
     try{
-        const info=await checkUpdate(true);if(dialog!=='update')return;
+        const info=await checkUpdate(true);if(!status.isConnected)return;
         status.textContent='Установлена версия '+info.current+'. Последняя на GitHub: '+(info.latest || 'нет выпусков')+'.';
         if(info.newer){
-            if(info.notes)modal.append(el('p','synopsis',info.notes.slice(0,600)));
+            if(info.notes)actions.before(releaseNotes(info.notes));
             const go=btn('Скачать и установить '+info.latest,async()=>{
                 go.disabled=true;go.textContent='Скачиваю…';
                 try{await request('install',{url:info.url});go.textContent='Открываю установщик…';}
                 catch(e){go.disabled=false;go.textContent='Повторить';status.textContent=e.message;}
             },'primary');
-            modal.append(go);focus(go);
-        }else{modal.append(el('p','note','У вас последняя версия.'));focus(done);}
-    }catch(e){if(dialog==='update'){status.textContent=e.message;focus(done);}}
-    modal.append(done);
+            actions.prepend(go);focus(go);
+        }else{actions.before(el('p','note','У вас последняя версия.'));focus(done);}
+    }catch(e){if(status.isConnected){status.textContent=e.message;focus(done);}}
 }
 function updateBanner(){
     if(!updateInfo || !updateInfo.newer)return null;
@@ -385,6 +414,14 @@ async function openItem(item,page,from,hint=null) {
     const token=++version;currentItem=item;detail=null;selected=0;activeEpisode='';sectionPage='';episodes=[];seasons=[];
     root.replaceChildren(btn('‹ Назад',back,'subtle back'),detailSkeleton());window.scrollTo(0,0);
     try{
+        const tmdb=tmdbTitle(item.url);
+        if(tmdb){
+            const data=await request('tmdbTitle',{type:tmdb[1],id:tmdb[2]}).catch(()=>({}));
+            if(token!==version)return;
+            currentItem={...item,...data.item};
+            detail={...data,page:item.url,players:[],seasons:[],episodes:[]};
+            showDetail(true);return;
+        }
         const d=await getDetail(page);if(token!==version)return;
         detail=d;seasons=d.seasons;episodes=d.episodes;sectionPage='';activeEpisode='';
         if(!item.year && d.year)item.year=d.year;
@@ -474,7 +511,12 @@ function showDetail(moveFocus=false) {
     const selectable=!hasEpisodeList || !!activeEpisode;
     let primary;
     const series=seriesContext();
-    if(selectable && (d.players.length || series)) {
+    const movie=item.kind!=='Сериал' && !hasEpisodeList;
+    const tmdb=tmdbTitle(item.url);
+    if(movie || tmdb){
+        actions.append(SeansUI.playActions('Смотреть',false,()=>otherSites()));
+        primary=actions.querySelector('.primary');
+    }else if(selectable && (d.players.length || series)) {
         const past=viewings.find(x=>x.page===d.page && x.position && !x.finished);
         const website=!series && isWebsite(d.players[selected]);
         const label=website?'Открыть плеер сайта':past?'Продолжить с '+clock(past.position):'Смотреть';
@@ -494,10 +536,12 @@ function showDetail(moveFocus=false) {
         primary=btn('▶ '+verb+' · '+next.label,()=>selectPart(next,false),'primary');
         actions.append(primary);
     }
-    if(d.website)actions.append(btn('Открыть страницу Zona',()=>Cinema.play(JSON.stringify(item),JSON.stringify({page:d.page,title:d.title,players:[{label:'Zona',type:'site',url:d.website}]}),0,false)));
-    const chosen=series && sourcePreferences(series).choice;
-    const sourceLabel=series?(chosen?'Озвучка · '+chosen.label+(chosen.edition?' ✂':''):'Выбрать озвучку'):'Источник · '+sourceName(item.url);
-    const sites=btn(sourceLabel,otherSites);sites.dataset.sites='';actions.append(sites);
+    if(!movie && !tmdb){
+        if(d.website)actions.append(btn('Открыть страницу Zona',()=>Cinema.play(JSON.stringify(item),JSON.stringify({page:d.page,title:d.title,players:[{label:'Zona',type:'site',url:d.website}]}),0,false)));
+        const chosen=series && sourcePreferences(series).choice;
+        const sourceLabel=series?(chosen?'Озвучка · '+chosen.label+(chosen.edition?' ✂':''):'Выбрать озвучку'):'Источник · '+sourceName(item.url);
+        const sites=btn(sourceLabel,otherSites);sites.dataset.sites='';actions.append(sites);
+    }
     if(series && !Cinema.maximumQuality()){
         const season=qualitySeason(series), saved=Cinema.savedQuality(season);
         if(saved>=-1){
@@ -531,12 +575,54 @@ function showDetail(moveFocus=false) {
         body.append(el('h3','section','Серии'),SeansUI.parts(markWatched(episodes),activeEpisode,false,selectPart));
     }
     if(activeEpisode)body.append(el('p','section',d.title));
-    if(!series && d.players.length>1 && selectable){
+    if(!movie && !series && d.players.length>1 && selectable){
         const source=btn('Плеер · '+d.players[selected].label,()=>sourceDialog(),'subtle section');body.append(source);
     }
-    if(d.description){body.append(el('h3','section',seasons.length || item.kind==='Сериал'?'О сериале':'О фильме'),el('p','synopsis',d.description));}
+    const about=el('section','section'), synopsis=el('p','synopsis',d.description || '');
+    const aboutTitle=el('h3','',seasons.length || item.kind==='Сериал'?'О сериале':'О фильме');
+    aboutTitle.hidden=synopsis.hidden=!d.description;
+    about.hidden=!d.description;
+    about.append(aboutTitle,synopsis);
+    if(d.cast?.length){about.hidden=false;about.append(el('h3','section','В ролях'),el('p','synopsis',d.cast.join(', ')));}
+    if(d.trailer){about.hidden=false;about.append(btn('Смотреть трейлер',()=>Cinema.openTrailer(d.trailer),'secondary section'));}
+    body.append(about);
+    enrichDetail(item,d,poster,about,synopsis);
     if(moveFocus && mode==='tv')focus(primary || body.querySelector('[data-episode]') || star);
     function play(external){if(series){playSeries(external);return;}Cinema.play(JSON.stringify(item),JSON.stringify({page:d.page,title:activeEpisode ? d.title : item.title,players:d.players}),selected,external);}
+}
+function enrichDetail(item,d,poster,about,synopsis){
+    const id=kinopoiskId(item,d);
+    if(!id || !Cinema.metadataEnabled())return;
+    if(!movieMetadata.has(id)){
+        if(movieMetadata.size>=40)movieMetadata.delete(movieMetadata.keys().next().value);
+        const lookup=request('metadata',{id});
+        movieMetadata.set(id,lookup);
+        lookup.then(data=>{
+            if(!data.id && movieMetadata.get(id)===lookup)movieMetadata.delete(id);
+        },()=>{
+            if(movieMetadata.get(id)===lookup)movieMetadata.delete(id);
+        });
+    }
+    const lookup=movieMetadata.get(id);
+    lookup.then(data=>{
+        if(!about.isConnected || movieMetadata.get(id)!==lookup || Number(data.id)!==Number(id))return;
+        const cover=data.poster?.url;
+        if(typeof cover==='string' && cover.startsWith('https://')){
+            const image=img(cover);
+            image.onload=()=>{const current=poster.querySelector('img');if(current)current.replaceWith(image);};
+        }
+        if(data.description){
+            synopsis.textContent=data.description;
+            about.hidden=synopsis.hidden=synopsis.previousElementSibling.hidden=false;
+        }
+        const cast=[...new Set((data.persons || []).filter(person=>person.enProfession==='actor' || person.profession==='актеры')
+            .map(person=>person.name || person.enName).filter(Boolean))].slice(0,8);
+        if(cast.length){about.hidden=false;about.append(el('h3','section','В ролях'),el('p','synopsis',cast.join(', ')));}
+        const trailers=(data.videos?.trailers || []).filter(video=>typeof video.url==='string' &&
+            /^https:\/\/(?:rutube\.ru|www\.rutube\.ru|vk\.com|vkvideo\.ru|www\.youtube\.com|youtube\.com|youtu\.be)\//.test(video.url));
+        const trailer=trailers.find(video=>/^https:\/\/(?:rutube\.ru|www\.rutube\.ru|vk\.com|vkvideo\.ru)\//.test(video.url)) || trailers[0];
+        if(trailer){about.hidden=false;about.append(btn('Смотреть трейлер',()=>Cinema.openTrailer(trailer.url),'secondary section'));}
+    }).catch(()=>{});
 }
 function sourceDialog(){
     beginDialog('sources','Источник видео');detail.players.forEach((p,i)=>modal.append(btn((i===selected?'✓ ':'')+[p.label,editionNote(p)].filter(Boolean).join(' · '),()=>{selected=i;closeDialog();showDetail(true);},'option')));
@@ -603,7 +689,7 @@ function back() {
     if(dialog==='torrent-list'){otherSites();return true;}
     if(dialog==='mode'){settings();return true;}
     if(dialog==='manage-sites'){finishSiteSettings();return true;}
-    if(dialog==='tiles' || dialog==='update' || dialog==='alerts'){settings();return true;}
+    if(dialog==='tiles' || dialog==='update' || dialog==='alerts' || dialog==='metadata-settings'){settings();return true;}
     if(dialog){closeDialog();return true;}
     if(currentItem){
         const url=currentItem.url,scroll=returnScroll;currentItem=null;detail=null;navigate(tab);
@@ -640,19 +726,6 @@ function moveFocus(key){
     else if(key==='ArrowRight' && menuOpen)closeMenu();
     return true;
 }
-// Touch: swipe right from the left part of the screen opens the menu, swipe left closes it.
-let swipe=null;
-document.addEventListener('touchstart',e=>{
-    const t=e.touches[0];swipe=e.touches.length===1?{x:t.clientX,y:t.clientY,at:Date.now()}:null;
-},{passive:true});
-document.addEventListener('touchend',e=>{
-    if(!swipe || dialog)return;
-    const t=e.changedTouches[0],dx=t.clientX-swipe.x,dy=t.clientY-swipe.y,fast=Date.now()-swipe.at<600;
-    const start=swipe.x;swipe=null;
-    if(!fast || Math.abs(dx)<60 || Math.abs(dy)>Math.abs(dx)*0.7)return;
-    if(!menuOpen && dx>0 && start<window.innerWidth*0.18)openMenu();
-    else if(menuOpen && dx<0)closeMenu();
-},{passive:true});
 document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();back();return;}
     if(!e.key.startsWith('Arrow'))return;

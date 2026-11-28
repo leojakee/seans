@@ -49,7 +49,7 @@ function acceptCatalog(data) {
 }
 function switchSite(data) {
     acceptCatalog(data);
-    Cinema.setMirror(data.root);mirror=data.root;home=data;section=null;category='Все';
+    Cinema.setMirror(data.root);mirror=data.root;home=data;category='Все';
 }
 function selectSite(data) {
     switchSite(data);results=null;query='';searchDraft='';detailCache.clear();
@@ -82,8 +82,11 @@ function settings() {
     modal.append(SeansUI.settings({tv:mode==='tv',maximum:Cinema.maximumQuality(),sites:searchSites().length,
         changeMode:()=>modePicker(false),changeSites:manageSearchSites,setMaximum:value=>Cinema.setMaximumQuality(value),tiles:tileLabel(),changeTiles:()=>tilesDialog()}),
         btn('Обновления'+(updateInfo && updateInfo.newer?' · доступна '+updateInfo.latest:''),updateDialog,'secondary section'),
+        btn('ПоискКино · '+(Cinema.metadataEnabled()?'подключён':'подключить'),metadataSettings,'secondary section'),
         btn('Новые серии в избранном · '+(Cinema.episodeAlerts()?'уведомлять':'выключено'),()=>{Cinema.setEpisodeAlerts(!Cinema.episodeAlerts());settings();},'secondary section'),
-        el('h3','section','Основной каталог'));
+        el('h3','section','Основной каталог'),
+        el('p','note',Cinema.tmdbEnabled()?'Резервный каталог для полки «Новое». Поиск использует все включённые источники.':
+            'Сайт, из которого заполняется полка «Новое в каталоге». Поиск использует все включённые источники.'));
     const input=el('input','address');input.type='url';input.setAttribute('aria-label','Адрес зеркала');input.value=mirror;
     const info=el('p','note');
     const save=btn('Проверить и сохранить',async()=>{
@@ -127,7 +130,29 @@ function settings() {
     });
     const actions=el('div','wrap');actions.append(save,scan);
     modal.append(input,actions,info,summary,checked,btn('Закрыть',closeDialog,'subtle section'));
+    if(Cinema.tmdbEnabled()){
+        const credits=el('section','section');
+        const logo=img('https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg');
+        logo.width=86;logo.alt='TMDB';
+        credits.append(el('h3','','О приложении'),logo,el('p','note','This product uses the TMDB API but is not endorsed or certified by TMDB.'));
+        modal.append(credits);
+    }
     focus(modal.querySelector('button'));
+}
+function metadataSettings(){
+    beginDialog('metadata-settings','ПоискКино');
+    const input=el('input','address');input.type='password';input.autocomplete='off';input.placeholder='API-ключ';
+    input.setAttribute('aria-label','API-ключ ПоискКино');
+    const status=el('p','note',Cinema.metadataEnabled()?'Ключ сохранён на устройстве.':'Ключ выдаёт Telegram-бот @poiskkinodev_bot.');
+    const actions=el('div','wrap');
+    actions.append(btn('Сохранить',()=>{
+        const key=input.value.trim();
+        if(!/^[A-Za-z0-9_-]{8,256}$/.test(key)){status.textContent='Проверьте формат API-ключа.';return;}
+        Cinema.setMetadataKey(key);movieMetadata.clear();settings();
+    },'primary'));
+    if(Cinema.metadataEnabled())actions.append(btn('Отключить',()=>{Cinema.setMetadataKey('');movieMetadata.clear();settings();}));
+    actions.append(btn('Назад',settings,'subtle'));
+    modal.append(status,input,actions);focus(mode==='tv'?actions.querySelector('button'):input);
 }
 
 function sourceName(url) {
@@ -147,13 +172,15 @@ function titlesAt(site,term) {
 function otherSites(external=false,reason=''){
     external=external===true;
     const item=currentItem;if(!item)return;
+    const tmdb=tmdbTitle(item.url);
     const current=new URL(item.url).origin;
     const releaseYear=item.year || (detail && detail.year) || '';
     const ctx=seriesContext();
+    const movie=!ctx && item.kind!=='Сериал' && !seasons.length && !episodes.length;
     const hint=ctx?{season:ctx.season,episode:ctx.episode}:
         {season:partNumber(seasons.find(s=>s.url===sectionPage)),episode:partNumber(episodes.find(e=>e.url===activeEpisode))};
     const suggested=ctx && sourcePreferences(ctx).suggestion;
-    beginDialog('other-sites',ctx?'Выберите озвучку':item.title);
+    beginDialog('other-sites',ctx?'Выберите озвучку':movie || tmdb?'Выберите источник':item.title);
     const list=el('div'),status=el('p','note section'),done=btn('Закрыть',closeDialog,'subtle');
     const players=el('div'), torrents=btn('Смотреть через торрент',()=>torrentDialog(item,releaseYear,hint),'option');
     if(ctx){
@@ -162,14 +189,15 @@ function otherSites(external=false,reason=''){
         if(reason)modal.append(el('p','note',reason));
         if(external)modal.append(el('p','note','Для внешнего видеоплеера'));
         modal.append(players,list,status);
-    }else modal.append(list,status,players);
+    }else if(movie || tmdb)modal.append(el('p','',item.title),players,list,status);
+    else modal.append(list,status,players);
     modal.append(torrents,done);
     const found=new Set([current]), shown=new Set([item.url]);
     const checkedPlayers=new Set();
     let pendingPlayers=0,scanning=true;
-    const counts=el('p','note');if(ctx)status.before(counts);
+    const counts=el('p','note');if(ctx || movie)status.before(counts);
     function updateCount(){
-        if(!ctx || !counts.isConnected)return;
+        if(!counts.isConnected)return;
         counts.textContent=pendingPlayers?'Проверяю плееры…':!scanning && !players.querySelector('[data-provider]')?'Для этого просмотра плееры не найдены.':'';
     }
     function addOption(route,option){
@@ -178,7 +206,12 @@ function otherSites(external=false,reason=''){
         const key=JSON.stringify(route);
         if([...players.querySelectorAll('[data-route]')].some(b=>b.dataset.route===key))return;
         const previous=sameRoute(suggested,route);
-        const b=btn('',()=>launchSeries(ctx,route,option,external,true),'option');
+        const b=btn('',()=>{
+            if(ctx){launchSeries(ctx,route,option,external,true);return;}
+            closeDialog();
+            const data={page:detail?.page || item.url,sourcePage:option.page,title:item.title,players:[p]};
+            Cinema.play(JSON.stringify(item),JSON.stringify(data),0,external);
+        },'option');
         b.dataset.route=key;b.dataset.provider=p.label;
         b.append(el('strong','',p.label+(previous?' · прошлый выбор':'')));
         const catalog=route.method==='detail'?sourceName(route.base):route.method==='vibix'?'Kinonox':'';
@@ -192,13 +225,17 @@ function otherSites(external=false,reason=''){
     function checkCatalog(candidate){
         function show(d){
             for(const p of d.players){
-                if(p.type==='kinonoxWeb'){continue;} // Listed by the verified episode-specific Vibix lookup below.
+                if(p.type==='kinonoxWeb'){continue;} // The dedicated Vibix lookup handles this source.
+                addOption(catalogRoute(candidate.url,p),{p,page:d.page});
+            }
+            if(movie && d.website && !d.players.some(p=>p.url===d.website)){
+                const p={label:'Zona',type:'site',url:d.website};
                 addOption(catalogRoute(candidate.url,p),{p,page:d.page});
             }
         }
-        if(candidate.url===item.url){show(detail);return;}
+        if(candidate.url===item.url && detail){show(detail);return;}
         pendingPlayers++;updateCount();
-        episodePage(ctx,candidate.url).then(page=>page?getDetail(page):null)
+        (movie?getDetail(candidate.url):episodePage(ctx,candidate.url).then(page=>page?getDetail(page):null))
             .then(d=>{if(d && players.isConnected)show(d);})
             .catch(()=>{if(players.isConnected)catalogRetry(candidate);})
             .finally(()=>{pendingPlayers--;updateCount();});
@@ -220,9 +257,9 @@ function otherSites(external=false,reason=''){
                 const p=await request(provider.toLowerCase(),Object.assign({},args,hint));
                 if(!placeholder.isConnected)return;
                 if(!p.url){placeholder.remove();return;}
-                if(ctx){
+                if(ctx || movie){
                     placeholder.remove();
-                    addOption({method:provider.toLowerCase(),base:args.id || args.page,label:provider},{p,page:detail.page});
+                    addOption({method:provider.toLowerCase(),base:args.id || args.page,label:provider},{p,page:detail?.page || item.url});
                     return;
                 }
                 const button=btn('',()=>{
@@ -249,7 +286,7 @@ function otherSites(external=false,reason=''){
         if(u.origin==='https://kinonox.com')checkPlayer('Vibix',{page:candidate.url});
     }
     function row(candidate,chosen) {
-        if(ctx){checkCatalog(candidate);return;}
+        if(ctx || movie){checkCatalog(candidate);return;}
         const site=new URL(candidate.url).origin;
         const button=btn('',()=>{
             closeDialog();if(chosen)return;
@@ -267,13 +304,16 @@ function otherSites(external=false,reason=''){
         const site=new URL(candidate.url).origin;
         const id=kinopoiskId(candidate,null);
         if(ctx && ctx.id && id && id!==ctx.id)return;
-        if(shown.has(candidate.url) || site===current || searchText(candidate.title)!==searchText(item.title) || candidate.kind!==item.kind ||
-            (releaseYear && candidate.year!==releaseYear))return;
+        const name=searchText(candidate.title);
+        const titleMatches=name===searchText(item.title) || (tmdb && item.originalTitle && name===searchText(item.originalTitle));
+        if(shown.has(candidate.url) || site===current || !titleMatches || candidate.kind!==item.kind ||
+            (releaseYear && String(candidate.year)!==String(releaseYear)))return;
         if(ctx && releaseYear && candidate.year===releaseYear)linkSeries([item,candidate],ctx.id);
         shown.add(candidate.url);found.add(site);row(candidate,false);
         if(releaseYear && candidate.year===releaseYear)discover(candidate);
     }
-    row(item,true);discover(item);focus((ctx?players:list).querySelector('button') || done);
+    if(!tmdb){row(item,true);discover(item);}
+    focus((ctx || movie?players:list).querySelector('button') || done);
     if(results)for(const site of results.sites)if(searchSites().includes(site.site))site.items.forEach(add);
     const remaining=searchSites().filter(site=>!found.has(site));
     const failed=[];
@@ -287,7 +327,13 @@ function otherSites(external=false,reason=''){
             if(failed.length)status.append(btn('Повторить для недоступных · '+failed.length,()=>scan(failed.splice(0)),'chip'));
         }
         refresh();for(const site of sites){
-            titlesAt(site,item.title).then(data=>{if(list.isConnected)data.items.forEach(add);},()=>failed.push(site))
+            titlesAt(site,item.title).then(data=>{
+                if(!list.isConnected)return null;
+                data.items.forEach(add);
+                if(tmdb && !found.has(site) && item.originalTitle && searchText(item.originalTitle)!==searchText(item.title))
+                    return titlesAt(site,item.originalTitle).then(result=>{if(list.isConnected)result.items.forEach(add);});
+                return null;
+            }).catch(()=>failed.push(site))
                 .then(()=>{pending--;if(list.isConnected)refresh();});
         }
     }

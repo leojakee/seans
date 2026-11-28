@@ -90,32 +90,18 @@ h1{font-size:clamp(26px,4vw,40px)}h2{font-size:22px}
 .topbar{display:flex;align-items:center;gap:6px;height:56px;padding-inline:calc(var(--space) - 8px);border:0}
 .topbar .MuiIconButton-root{color:#fff;width:42px;height:42px}
 .topbar .brand{font:700 22px/1 Georgia,serif;letter-spacing:-1px;margin:0 8px 0 4px;gap:8px}
-.topbar .mark{width:18px;height:18px;background:linear-gradient(#fff,#fff) 0 0/100% 3px,linear-gradient(#fff,#fff) 0 5px/78% 3px,linear-gradient(#fff,#fff) 0 10px/55% 3px,linear-gradient(#fff,#fff) 0 15px/32% 3px;background-repeat:no-repeat}
-.topbar-title{color:var(--muted);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:1px solid #ffffff26;padding-left:12px}
-.topbar .spacer{flex:1}
-.clock{display:flex;align-items:center;gap:8px;margin-left:10px;padding-left:12px;border-left:1px solid #ffffff26}
-.clock strong{font-size:24px;font-weight:600}.clock small{font-size:10px;line-height:1.2;color:var(--muted)}
-.tv #chrome .topbar{height:68px;padding:8px var(--space) 0}
 
 /* Side menu */
-.topbar .mark{display:none}
 main{transition:opacity .2s}
 body.menu-open main,body.menu-open #tabs{opacity:.3}
 #sidemenu{position:fixed;z-index:9;top:0;bottom:0;left:0;width:270px;padding:72px 14px 20px;display:flex;flex-direction:column;gap:4px;
     background:#1d1f20f7;transform:translateX(-105%);transition:transform .2s ease;overflow:auto}
 #sidemenu.open{transform:none;box-shadow:12px 0 40px #000a}
-.tv #sidemenu{transform:none;transition:width .2s ease;overflow-x:hidden}
-.tv #sidemenu:not(.open){width:var(--rail-width);padding:16px 6px;background:var(--bg)}
-.tv #sidemenu:not(.open) .menu-head,.tv #sidemenu:not(.open) .drawer-label{display:none}
-.tv #sidemenu:not(.open) .MuiButton-root{align-self:center;flex:none;justify-content:center;width:44px;height:44px;min-width:0;min-height:0;padding:0;border-radius:50%;color:var(--muted)}
-.tv #sidemenu:not(.open) .MuiButton-startIcon{margin:0}
-.tv #sidemenu:not(.open) .MuiButton-root.on{color:#fff}
 .drawer-label{white-space:nowrap}
 #sidemenu .MuiButton-root{justify-content:flex-start;min-height:46px;padding:8px 16px;border-radius:12px;color:#d6d9dc;font-size:16px;font-weight:500}
 #sidemenu .MuiButton-startIcon{margin-right:16px}
 #sidemenu .MuiButton-root.on{color:#fff;background:#ffffff14}
 #sidemenu .MuiButton-root:focus,#sidemenu .MuiButton-root:focus-visible{background:#fff;color:#111;outline:none}
-.tv #sidemenu .MuiButton-root{font-size:19px;min-height:52px}
 
 /* Focus: white, as on TV media centres */
 button:focus-visible,input:focus-visible,select:focus-visible,.tv :focus{outline:3px solid #fff;outline-offset:2px}
@@ -161,6 +147,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.tv :focus{outline
 
 /* Shelves */
 main{padding-top:4px}
+.tv main{padding-top:16px}
 .page-title{font-size:28px;margin:10px 0 18px}
 .shelf-block{margin:10px 0 26px}
 .shelf-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
@@ -204,14 +191,17 @@ main{padding-top:4px}
 .option:focus span{color:#333}
 
 /* Phone */
-body:not(.tv) #tabs{position:fixed;inset:auto 0 0;z-index:5;margin:0;padding:5px 8px;gap:0;flex-wrap:nowrap;
+body:not(.tv){--bottom-bar:55px}
+body:not(.tv) #tabs{position:fixed;inset:auto 0 0;z-index:10;margin:0;padding:5px 8px;gap:0;flex-wrap:nowrap;
+    height:var(--bottom-bar);
     justify-content:space-around;background:#1d1f20f5;backdrop-filter:blur(14px);border-top:1px solid var(--line)}
 body:not(.tv) #tabs .MuiIconButton-root{width:54px;height:44px;border-radius:14px;color:var(--muted)}
 body:not(.tv) #tabs .MuiIconButton-root[aria-current=page]{background:#ffffff1f;color:#fff}
+body:not(.tv) #tabs .home-chevron{font-size:15px;margin-left:2px}
+body:not(.tv) #tabs [aria-expanded=true] .home-chevron{transform:rotate(180deg)}
 body:not(.tv) main{padding-bottom:76px}
 @media(max-width:760px){
     body:not(.tv) #chrome .topbar{height:52px}
-    body:not(.tv) .clock,body:not(.tv) .topbar-title{display:none}
     body:not(.tv) .grid:not(.row){grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 10px}
     body:not(.tv) .grid.row{grid-auto-columns:30%;gap:10px}
     body:not(.tv) .grid .card strong{font-size:13px;margin-top:7px}
@@ -250,8 +240,6 @@ body.tv.tiles-l .grid .card small{font-size:17px}
 @media(max-width:760px){body:not(.tv) .profile h1{font-size:24px}}
 
 /* Menu button, scrim and logo */
-.topbar .menu-button.MuiIconButton-root{width:42px;height:42px;border-radius:50%;background:#ffffff14}
-.topbar .menu-button:focus,.topbar .menu-button:focus-visible{background:#fff;color:#111;outline:none}
 #menu-scrim{position:fixed;inset:0;z-index:8;background:#000a;opacity:0;pointer-events:none;transition:opacity .2s}
 #menu-scrim.open{opacity:1;pointer-events:auto}
 body.menu-open main,body.menu-open #tabs{opacity:1}
@@ -264,9 +252,35 @@ body.menu-open main,body.menu-open #tabs{opacity:1}
 .menu-head .brand{margin:0}
 #sidemenu{padding-top:22px;z-index:9}
 .tv .logo-mark{width:34px;height:34px}.tv .logo-text{font-size:26px}
+body:not(.tv) #sidemenu{inset:auto 8px var(--bottom-bar);width:min(360px,calc(100% - 16px));
+    max-height:calc(100vh - var(--bottom-bar) - 12px);max-height:calc(100dvh - var(--bottom-bar) - 12px);
+    padding:8px;border:1px solid var(--line);border-radius:18px 18px 0 0;background:var(--panel);opacity:0;visibility:hidden;
+    transform:translateY(10px);transition:transform .18s ease,opacity .18s ease,visibility .18s}
+body:not(.tv) #sidemenu.open{transform:none;opacity:1;visibility:visible;box-shadow:0 -8px 32px #0006}
+body:not(.tv) #sidemenu .MuiButton-root{flex:none}
+
+/* Reveal the drawer without resizing its rows or moving the rail icons. */
+.tv #sidemenu{--drawer-width:270px;width:var(--drawer-width);padding:12px 7px 16px;
+    background:var(--bg);transform:none;clip-path:inset(0 calc(var(--drawer-width) - var(--rail-width)) 0 0);
+    transition:clip-path .22s ease-out;overflow-x:hidden;scrollbar-width:none}
+.tv #sidemenu.open{clip-path:inset(0);box-shadow:none}
+.tv #sidemenu .menu-head{display:flex;align-items:center;flex:none;height:48px;padding:0 5px;margin-bottom:4px;border:0}
+.tv #sidemenu .brand{gap:12px}
+.tv #sidemenu .logo-text,.tv #sidemenu .drawer-label{opacity:0;transition:opacity .16s ease}
+.tv #sidemenu.open .logo-text,.tv #sidemenu.open .drawer-label{opacity:1}
+.tv #sidemenu .MuiButton-root{flex:none;height:44px;min-height:44px;padding:0 12px 0 0;font-size:18px}
+.tv #sidemenu .MuiButton-startIcon{display:grid;place-items:center;flex:none;width:44px;height:44px;margin:0 6px 0 0}
+.tv #sidemenu:not(.open) .MuiButton-root{color:var(--muted);background:none}
+.tv #sidemenu:not(.open) .MuiButton-root.on{color:#fff;background:radial-gradient(circle at 22px 50%,#ffffff14 21.5px,transparent 22px)}
 
 .update-banner{display:block;width:100%;margin:6px 0 18px;padding:14px 18px;border-radius:14px;background:#ffc93a;color:#17191a;font-weight:700;font-size:16px;text-align:left}
 .update-banner:focus{outline:3px solid #fff;outline-offset:2px}
+.release-notes{display:grid;gap:10px;margin-top:16px;line-height:1.5;overflow-wrap:anywhere;min-width:0}
+.release-notes p{color:inherit}
+.release-notes h3{font-size:1.07em}
+.release-notes ul,.release-notes ol{margin:0;padding-inline-start:22px}
+.release-notes li+li{margin-top:6px}
+.modal .update-actions{margin-top:20px;gap:8px}
 
 .mui-search-form{--search-control:44px;gap:8px}
 .mui-search-form .MuiTextField-root{flex:1;min-width:0;width:auto}
@@ -284,10 +298,12 @@ body.menu-open main,body.menu-open #tabs{opacity:1}
 .sk-row{display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - 5*14px)/6.3);gap:14px;overflow:hidden;margin-bottom:26px}
 .sk-art{aspect-ratio:2/3;border-radius:12px}
 .sk-art,.sk-line,.sk-title{background:linear-gradient(100deg,#ffffff0d 20%,#ffffff1f 40%,#ffffff0d 60%) 0 0/300% 100%;animation:shimmer 1.4s linear infinite}
+.poster-loading{position:absolute;inset:0;z-index:1;background-color:#2a2d2f}
+.poster-awaiting{opacity:0}
 .sk-line{height:12px;border-radius:6px;margin-top:10px}.sk-line.short{width:55%}
 .title-info .sk-title{max-width:100%;margin-top:6px}
 .title-info .sk-line{max-width:420px}
-@media(prefers-reduced-motion:reduce){.sk-art,.sk-line,.sk-title{animation:none}.tv #sidemenu{transition:none}}
+@media(prefers-reduced-motion:reduce){.sk-art,.sk-line,.sk-title{animation:none}#sidemenu,.tv #sidemenu .logo-text,.tv #sidemenu .drawer-label{transition:none}}
 @keyframes shimmer{from{background-position:100% 0}to{background-position:-200% 0}}
 @media(max-width:760px){body:not(.tv) .sk-row{grid-auto-columns:30%}}
 .import-text{width:100%;min-height:110px;margin:10px 0;resize:vertical;font:13px/1.4 monospace}

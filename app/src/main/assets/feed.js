@@ -93,16 +93,14 @@ function showFeed(category,token){
     const host=SeansUI.grid([]);
     const marker=el('div','feed-marker');
     root.append(title,host,marker);
-    let shown=0;
     function render(){
         if(token!==version || !host.isConnected)return;
         const groups=feedGroups(feed);
         const answered=feed.sites.filter(s=>s.started && !s.busy).length;
         title.querySelector('.feed-state').textContent='Источников: '+answered+' из '+feed.sites.length+' · Найдено: '+groups.length;
-        if(groups.length!==shown){shown=groups.length;SeansUI.updateGrid(host,feedEntries(groups));}
         const done=feedDone(feed);
+        SeansUI.updateGrid(host,feedEntries(groups),done?0:Math.max(0,8-groups.length));
         if(done)marker.textContent=groups.length?'Это всё, что нашлось.':'Ничего не нашлось. Проверьте источники в настройках.';
-        else if(!marker.firstElementChild)marker.replaceChildren(skeleton(1));
         settleFocus();
     }
     feed.listeners.add(render);
@@ -115,19 +113,22 @@ function showFeed(category,token){
 // A home-screen shelf filled from the feed as sites answer.
 function feedShelf(category,title){
     const feed=feedFor(category);
-    const host=SeansUI.grid([]);
+    const initialSlots=8, limit=24;
+    const host=SeansUI.grid([],initialSlots);
     const block=shelf(title,host,category);
-    const loading=skeleton(1);host.after(loading);
-    let shown=0, attached=false;
+    const visible=new Map();
+    let attached=false;
     function render(){
         // Sites can answer before the shelf is on the page: only a shelf that was shown and then removed stops listening.
         if(!host.isConnected){if(attached)feed.listeners.delete(render);return;}
         attached=true;
-        const groups=feedGroups(feed).slice(0,24);
-        if(groups.length!==shown){shown=groups.length;SeansUI.updateGrid(host,feedEntries(groups));settleFocus();}
-        loading.hidden=groups.length>0 || feedDone(feed);
-        host.hidden=!groups.length;
-        block.hidden=!groups.length && feedDone(feed);
+        for(const group of feedGroups(feed)){
+            if(visible.size<limit || visible.has(group.key))visible.set(group.key,group);
+        }
+        const loading=feedBusy(feed) || feed.sites.some(s=>!s.started && !s.done);
+        SeansUI.updateGrid(host,feedEntries([...visible.values()]),loading?Math.max(0,initialSlots-visible.size):0);
+        block.hidden=!visible.size && !loading;
+        settleFocus();
     }
     feed.listeners.add(render);
     if(!feed.sites.some(s=>s.started))feedMore(feed);
