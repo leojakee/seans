@@ -155,7 +155,7 @@ function otherSites(external=false,reason=''){
     const suggested=ctx && sourcePreferences(ctx).suggestion;
     beginDialog('other-sites',ctx?'Выберите озвучку':item.title);
     const list=el('div'),status=el('p','note section'),done=btn('Закрыть',closeDialog,'subtle');
-    const players=el('div'), torrents=btn('Найти раздачи в JacRed',()=>torrentDialog(item,releaseYear,hint),'option');
+    const players=el('div'), torrents=btn('Смотреть через торрент',()=>torrentDialog(item,releaseYear,hint),'option');
     if(ctx){
         const heading=[item.title,hint.season?'Сезон '+hint.season:'',hint.episode?'Серия '+hint.episode:''].filter(Boolean).join(' · ');
         modal.append(el('p','',heading));
@@ -184,7 +184,7 @@ function otherSites(external=false,reason=''){
         const catalog=route.method==='detail'?sourceName(route.base):route.method==='vibix'?'Kinonox':'';
         const quality=external?'Качество выбирается во внешнем плеере':
             isWebsite(p) && p.type!=='widgetMenu' && p.label!=='Collaps'?'Качество в меню сайта':'';
-        b.append(el('span','',[catalog,isWebsite(p)?'Плеер сайта':'Встроенный или внешний плеер',quality].filter(Boolean).join(' · ')));
+        b.append(el('span','',[catalog,isWebsite(p)?'Плеер сайта':'Внешний плеер при наличии',quality].filter(Boolean).join(' · ')));
         const note=editionNote(p);if(note)b.append(el('span','edition-note',note+' · полнота этой копии не проверена'));
         if(previous)players.prepend(b);else players.append(b);
         if(mode==='tv' && document.activeElement===done && players.querySelectorAll('[data-route]').length===1)focus(b);

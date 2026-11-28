@@ -20,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 final class Updater {
     static final String REPO = "leojakee/seans";
     private static final String API = "https://api.github.com/repos/" + REPO + "/releases/latest";
+    private static final String TORRSERVE_APK = "https://github.com/YouROK/TorrServe/releases/download/"
+            + "MatriX.145.Client/TorrServe_MatriX.145.Client.apk";
 
     /** {current, latest, newer, url, notes, page} or {error}. */
     static JSONObject check(Activity activity) throws Exception {
@@ -52,16 +54,34 @@ final class Updater {
                     Uri.parse("package:" + activity.getPackageName()))));
             throw new Exception("Разрешите «Сеансу» устанавливать приложения и нажмите «Обновить» ещё раз.");
         }
+        File file = downloadApk(activity, url, "seans-update.apk");
+        activity.runOnUiThread(() -> openInstaller(activity, file));
+    }
+
+    static File downloadTorrServe(Activity activity) throws Exception {
+        return downloadApk(activity, TORRSERVE_APK, "torrserve-matrix.apk");
+    }
+
+    private static File downloadApk(Activity activity, String url, String filename) throws Exception {
         File dir = new File(activity.getCacheDir(), "updates");
         dir.mkdirs();
-        File file = new File(dir, "seans-update.apk");
+        File file = new File(dir, filename);
         HttpURLConnection c = open(url);
-        if (c.getResponseCode() != 200) throw new Exception("Не удалось скачать обновление: HTTP " + c.getResponseCode() + ".");
-        try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(file)) { in.transferTo(out); }
+        try {
+            int code = c.getResponseCode();
+            if (code != 200) throw new Exception("Не удалось скачать APK: HTTP " + code + ".");
+            try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(file)) { in.transferTo(out); }
+            return file;
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    static void openInstaller(Activity activity, File file) {
         Uri uri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".updates", file);
         Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-        activity.runOnUiThread(() -> activity.startActivity(intent));
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        activity.startActivity(intent);
     }
 
     private static HttpURLConnection open(String address) throws Exception {

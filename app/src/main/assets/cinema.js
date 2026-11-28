@@ -56,7 +56,7 @@ function failure(error,retry) {
 const sectionTitles={home:'Главная',catalog:'Каталог',movies:'Фильмы',series:'Сериалы',continue:'Досмотреть',search:'Поиск',library:'Избранное'};
 const categorySections={'Все':'home','Каталог':'catalog','Фильмы':'movies','Сериалы':'series'};
 function currentSection(){return tab==='home'?categorySections[category]:tab;}
-function drawChrome(){const s=currentSection();SeansUI.selectTab(tab,s,sectionTitles[s]);}
+function drawChrome(){const s=currentSection();SeansUI.selectTab(tab,s,sectionTitles[s],mode==='tv');}
 function setTab(value) {
     tab=value;detail=null;currentItem=null;++version;
     drawChrome();
@@ -81,8 +81,9 @@ function entry(){
     return root.querySelector('.card') || root.querySelector('button:not(.back),input') || document.querySelector('[data-tab].on');
 }
 function openSection(id){
+    const returnFocus=menuReturn;
     closeMenu(false);
-    if(id==='settings'){settings();return;}
+    if(id==='settings'){settings();if(returnFocus)priorFocus=returnFocus;return;}
     if(id==='search' || id==='library' || id==='continue'){navigate(id);}
     else{
         const next=Object.keys(categorySections).find(c=>categorySections[c]===id) || 'Все';
@@ -145,18 +146,31 @@ function showShelves(token){
     const banner=updateBanner();if(banner)root.append(banner);
     const continued=viewings.filter(h=>!h.finished).slice(0,16);
     if(continued.length)root.append(shelf('Досмотреть',continueGrid(continued)));
-    root.append(shelf('Новое в каталоге',grid(home.items.slice(0,20)),'Каталог'));
+    const year=new Date().getFullYear();
+    const isCurrent=item=>Number(item.year)===year;
+    const recent=home.items.filter(isCurrent).concat(home.items.filter(item=>!isCurrent(item)));
+    root.append(shelf('Новое в каталоге',grid(recent.slice(0,20)),'Каталог'));
     root.append(feedShelf('Фильмы','Фильмы со всех источников'),feedShelf('Сериалы','Сериалы со всех источников'));
     if(favorites.length)root.append(shelf('Избранное',grid(favorites.slice(0,16))));
     settleFocus();
 }
-function skeleton(){
+function skeleton(rows=2){
     const box=el('div','skeleton');
-    for(let s=0;s<2;s++){
-        box.append(el('div','sk-title'));const row=el('div','sk-row');
+    box.setAttribute('aria-hidden','true');
+    for(let s=0;s<rows;s++){
+        if(rows>1)box.append(el('div','sk-title'));
+        const row=el('div','sk-row');
         for(let i=0;i<8;i++){const c=el('div','sk-card');c.append(el('div','sk-art'),el('div','sk-line'),el('div','sk-line short'));row.append(c);}
         box.append(row);
     }
+    return box;
+}
+function detailSkeleton(){
+    const head=el('div','title-head');
+    const info=el('div','title-info');
+    info.append(el('div','sk-title'),el('div','sk-line short'),el('div','sk-line'));
+    head.append(el('div','title-poster sk-art'),info);
+    const box=skeleton(1);box.prepend(head);
     return box;
 }
 function cacheHome(data){
@@ -173,7 +187,7 @@ async function selectCategory(value) {
     if(value===category)return;
     category=value;section=null;drawChrome();window.scrollTo(0,0);
     if(value==='Все' || value==='Каталог' || !home || !home.categories[value]){await showHome();return;}
-    const token=++version;root.replaceChildren(note('Загружаю '+value.toLowerCase()+'…',''));
+    const token=++version;root.replaceChildren(el('h1','page-title',value),skeleton(1));
     try{const data=await categoryData(value);
         if(token!==version)return;section=data;await showHome();
         if(mode==='tv')focus(entry());}
@@ -210,7 +224,6 @@ function profileName(){const p=profiles().find(x=>x.id===activeProfile());return
 function profileCard(){
     const card=el('section','profile');
     const name=profileName();
-    const avatar=el('div','avatar',name.slice(0,1).toUpperCase());
     const info=el('div','profile-info');
     const watched=viewings.length, finished=viewings.filter(v=>v.finished).length;
     const minutes=Math.round(viewings.reduce((sum,v)=>sum+(v.finished?(v.duration||v.position||0):(v.position||0)),0)/60000);
@@ -218,7 +231,7 @@ function profileCard(){
     const actions=el('div','wrap actions');
     actions.append(btn('Профили · '+profiles().length,profilesDialog),btn('Изменить имя',renameProfile),
         btn('Экспорт избранного',exportFavorites),btn('Импорт',importDialog),btn('Очистить историю',clearHistoryDialog));
-    info.append(actions);card.append(avatar,info);return card;
+    info.append(actions);card.append(info);return card;
 }
 function renameProfile(){
     beginDialog('profile','Как вас зовут?');
@@ -370,7 +383,7 @@ async function openItem(item,page,from,hint=null) {
     followFirstResult=false;
     if(!currentItem){returnScroll=window.scrollY;titleButton=from;}
     const token=++version;currentItem=item;detail=null;selected=0;activeEpisode='';sectionPage='';episodes=[];seasons=[];
-    root.replaceChildren(btn('‹ Назад',back,'subtle back'),note('Открываю карточку…',item.title));window.scrollTo(0,0);
+    root.replaceChildren(btn('‹ Назад',back,'subtle back'),detailSkeleton());window.scrollTo(0,0);
     try{
         const d=await getDetail(page);if(token!==version)return;
         detail=d;seasons=d.seasons;episodes=d.episodes;sectionPage='';activeEpisode='';
@@ -425,7 +438,9 @@ async function playNextEpisode(){
 }
 async function selectPart(part,isSeason,options={}) {
     const token=++version;
-    const status=el('p','note','Загружаю…');root.prepend(status);
+    const loading=skeleton(1);
+    const previous=root.querySelector('.part-loading');if(previous)previous.remove();
+    loading.classList.add('part-loading');root.append(loading);
     try{
         const data=await getDetail(part.url);if(token!==version)return;
         detail=data;selected=0;
@@ -435,7 +450,7 @@ async function selectPart(part,isSeason,options={}) {
         if(isSeason)focus(root.querySelector('[data-episode]'));
         // Season, then episode, then voice-over: picking an episode opens the voice-over list from every source.
         else if(seriesContext() && !options.quiet)otherSites();
-    }catch(e){if(token===version)status.textContent=e.message;}
+    }catch(e){if(token===version)loading.replaceWith(el('p','note part-loading',e.message));}
 }
 function showDetail(moveFocus=false) {
     const item=currentItem,d=detail;
@@ -531,14 +546,14 @@ function beginDialog(kind,title){
     if(!dialog)priorFocus=document.activeElement;
     dialog=kind;veil.hidden=false;
     closeMenu(false);
-    for(const n of [document.querySelector('header'),$('tabs'),root])n.inert=true;
+    for(const n of [document.querySelector('header'),$('tabs'),root].filter(Boolean))n.inert=true;
     document.body.style.overflow='hidden';modal.replaceChildren();const h=el('h2','',title);h.id='modalTitle';modal.append(h);
 }
 function closeDialog(){
     if(dialog==='first')return;
     dialog='';veil.hidden=true;modal.replaceChildren();document.body.style.overflow='';
-    for(const n of [document.querySelector('header'),$('tabs'),root])n.inert=false;
-    focus(priorFocus);priorFocus=null;
+    for(const n of [document.querySelector('header'),$('tabs'),root].filter(Boolean))n.inert=false;
+    focus(priorFocus?.isConnected && !priorFocus.closest('#sidemenu') && priorFocus!==document.body?priorFocus:entry());priorFocus=null;
 }
 function applyMode(value) {
     mode=value;localStorage.setItem('mode',value);document.body.classList.toggle('tv',value==='tv');Cinema.layout(value==='tv');
@@ -601,7 +616,16 @@ function back() {
 }
 function moveFocus(key){
     const scope=dialog?modal:menuOpen?$('sidemenu'):document;
-    const nodes=[...scope.querySelectorAll('button,input,select,textarea')].filter(n=>!n.disabled && !n.closest('[inert]') && n.getClientRects().length);
+    const nodes=[...scope.querySelectorAll('button,input,select,textarea')].filter(n=>!n.disabled && !n.closest('[inert], #sidemenu:not(.open)') && n.getClientRects().length);
+    if(menuOpen && key==='ArrowRight'){closeMenu();return true;}
+    const card=document.activeElement.closest('.card');
+    if(mode==='tv' && !dialog && !menuOpen && key==='ArrowLeft' && card){
+        const previous=card.previousElementSibling;
+        if(previous?.matches('.card') && (card.parentElement.classList.contains('row') || previous.offsetTop===card.offsetTop)){
+            previous.focus({preventScroll:true});reveal(previous);
+        }else openMenu();
+        return true;
+    }
     const current=document.activeElement;if(!nodes.includes(current)){if(nodes[0])nodes[0].focus();return true;}
     const r=current.getBoundingClientRect(),vertical=key==='ArrowDown'||key==='ArrowUp',sign=(key==='ArrowRight'||key==='ArrowDown')?1:-1;
     const pos=(b,axis)=>axis?(b.top+b.bottom)/2:(b.left+b.right)/2;
@@ -610,7 +634,6 @@ function moveFocus(key){
         const overlap=vertical? (b.right>r.left && b.left<r.right) : (b.bottom>r.top && b.top<r.bottom);
         return {n,dist,score:dist+side*(overlap ? 0.45 : 4)+(overlap?0:100)};
     }).filter(x=>x.dist>3).sort((a,b)=>a.score-b.score);
-    if(menuOpen && key==='ArrowRight'){closeMenu();return true;}
     if(choices.length){const next=choices[0].n;next.focus({preventScroll:true});reveal(next);}
     else if(vertical && !dialog && !menuOpen)window.scrollBy({top:sign*Math.round(window.innerHeight*0.45),behavior:'smooth'});
     else if(key==='ArrowLeft' && !dialog)openMenu();

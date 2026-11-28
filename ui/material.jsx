@@ -62,7 +62,7 @@ function updateRegion(host,view){
 }
 
 // Sections of the bottom bar (phone) and of the side menu (both modes); opened through window.openSection.
-const sections=[['home','Главная',HomeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon]];
+const sections=[['home','Главная',HomeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon],['settings','Настройки',SettingsIcon]];
 const menu=[['home','Главная',HomeIcon],['catalog','Каталог',ListIcon],['movies','Фильмы',MovieIcon],['series','Сериалы',SeriesIcon],
     ['continue','Досмотреть',ResumeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon],['settings','Настройки',SettingsIcon]];
 // The logo: a ticket-shaped play button and the name beside it.
@@ -82,33 +82,32 @@ function Clock(){
     return <span className="clock"><strong>{now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</strong>
         <small>{now.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}<br/>{now.toLocaleDateString('ru-RU',{weekday:'long'})}</small></span>;
 }
-function Chrome({active,section,title,menuOpen}){
+function Chrome({active,section,title,menuOpen,tv}){
     return <>
         <header className="topbar">
-            <Button id="menu-toggle" className="menu-button" aria-label="Меню" aria-expanded={menuOpen} startIcon={<MenuIcon/>}
-                onClick={()=>window.toggleMenu()}><span className="menu-label">Меню</span></Button>
+            {!tv && <IconButton id="menu-toggle" className="menu-button" aria-label="Меню" aria-expanded={menuOpen}
+                aria-controls="sidemenu" onClick={()=>window.toggleMenu()}><MenuIcon/></IconButton>}
             <Logo/>
             {title && <span className="topbar-title">{title}</span>}
             <span className="spacer"/>
-            <IconButton aria-label="Поиск" data-top="search" onClick={()=>window.openSection('search')}><SearchIcon/></IconButton>
-            <IconButton id="settings" aria-label="Настройки" onClick={()=>window.settings()}><SettingsIcon/></IconButton>
-            <Clock/>
+            {tv && <Clock/>}
         </header>
-        <nav id="tabs" aria-label="Разделы">{sections.map(([id,label,Icon])=>
-            <Button key={id} data-tab={id} className={active===id?'on':''} aria-current={active===id?'page':undefined}
-                startIcon={<Icon/>} onClick={()=>window.openSection(id)}>{label}</Button>)}</nav>
+        {!tv && <nav id="tabs" aria-label="Разделы">{sections.map(([id,label,Icon])=>
+            <IconButton key={id} data-tab={id} className={active===id?'on':''} aria-current={active===id?'page':undefined}
+                aria-label={label} onClick={()=>window.openSection(id)}><Icon/></IconButton>)}</nav>}
         <div id="menu-scrim" className={menuOpen?'open':''} onClick={()=>window.closeMenu()} aria-hidden="true"/>
-        <aside id="sidemenu" className={menuOpen?'open':''} aria-hidden={!menuOpen} inert={!menuOpen}>
+        <aside id="sidemenu" className={menuOpen?'open':''} aria-label="Разделы" inert={!tv && !menuOpen}>
             <div className="menu-head"><Logo/></div>
             {menu.map(([id,label,Icon])=><Button key={id} data-menu={id} className={section===id?'on':''} startIcon={<Icon/>}
-                onClick={()=>window.openSection(id)}>{label}</Button>)}
+                aria-label={label} aria-current={section===id?'page':undefined} tabIndex={tv && !menuOpen?-1:undefined}
+                onClick={()=>tv && !menuOpen?window.toggleMenu():window.openSection(id)}><span className="drawer-label">{label}</span></Button>)}
         </aside>
     </>;
 }
 const chrome=createRoot(document.getElementById('chrome'));
 const chromeState={active:'home',section:'home',title:'',menuOpen:false};
 function drawChrome(change){Object.assign(chromeState,change);flushSync(()=>chrome.render(themed(<Chrome {...chromeState}/>)));}
-function selectTab(tab,section=tab,title=''){drawChrome({active:tab,section,title});}
+function selectTab(tab,section=tab,title='',tv=false){drawChrome({active:tab,section,title,tv});}
 selectTab('home');
 const surface=createRoot(document.getElementById('veil'));
 flushSync(()=>surface.render(themed(<Paper component="section" id="modal" className="modal" role="dialog"

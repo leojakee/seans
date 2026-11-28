@@ -160,7 +160,9 @@ function renderSearchResults() {
             const item=group.items[0],siteLabel=group.items.length>1?'Сайтов: '+group.items.length:siteName(item.url);
             return {item,meta:meta(item)+' · '+siteLabel,focusId:group.key,open:button=>openGroup(group,button)};
         })));
-    }else if(!waiting){
+    }else if(waiting){
+        out.append(skeleton(1));
+    }else{
         if(session.sites.every(s=>s.error && !s.succeeded))out.append(note('Сайты недоступны','Можно повторить поиск на отдельном сайте или проверить зеркала в настройках.',settings,'Настройки'));
         else out.append(note('Совпадений пока нет','Измените запрос или фильтры. Если доступны следующие страницы, можно загрузить ещё.'));
     }

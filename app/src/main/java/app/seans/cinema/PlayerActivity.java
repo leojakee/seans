@@ -211,7 +211,19 @@ public class PlayerActivity extends Activity {
                 return null;
             }
         });
-        screen.addView(browser,new FrameLayout.LayoutParams(-1,-1)); toolbar(true); showWebTools();
+        toolbar(true);
+        if (website && getIntent().getBooleanExtra("tv",false)) {
+            // Keep the site's own controls below the app toolbar on TV.
+            LinearLayout webLayout=new LinearLayout(this);
+            webLayout.setOrientation(LinearLayout.VERTICAL);
+            screen.removeView(tools);
+            webLayout.addView(tools,new LinearLayout.LayoutParams(-1,-2));
+            webLayout.addView(browser,new LinearLayout.LayoutParams(-1,0,1));
+            screen.addView(webLayout,new FrameLayout.LayoutParams(-1,-1));
+        } else {
+            screen.addView(browser,0,new FrameLayout.LayoutParams(-1,-1));
+        }
+        showWebTools();
         if (website) {
             status.setText("Плеер сайта · "+source.optString("label"));
             if(detail.optBoolean("seriesChoice"))History.opened(this,item,detail.optString("page"),detail.optString("title"));
@@ -363,9 +375,9 @@ public class PlayerActivity extends Activity {
         stream=url; mime=type; headers=h;
         destroyBrowser();
         if (!foreground) return;
-        if (external) openExternal(); else playNative();
+        playResolvedStream();
     }
-    private void openExternal() {
+    private void playResolvedStream() {
         if (chooserOpened) return;
         Intent intent=new Intent(Intent.ACTION_VIEW);
         intent.setDataAndType(Uri.parse(stream),"video/*");
@@ -378,14 +390,10 @@ public class PlayerActivity extends Activity {
         intent.putExtra("return_result",true);
         intent.putExtra("com.android.browser.headers",bundle);
         try {
-            if (intent.resolveActivity(getPackageManager())==null) throw new ActivityNotFoundException();
+            startActivityForResult(intent,51);
             chooserOpened=true;
-            startActivityForResult(Intent.createChooser(intent,"Открыть видео в…"),51);
         } catch (ActivityNotFoundException e) {
-            status.setText("Установите видеоплеер, например VLC");
-            Button here=button("Смотреть здесь");
-            here.setOnClickListener(v->{external=false; playNative();});
-            screen.addView(here,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
+            playNative();
         }
     }
     @Override protected void onActivityResult(int code,int result,Intent data) {
@@ -530,7 +538,7 @@ public class PlayerActivity extends Activity {
         if(webQuality!=null)webQuality.setResumed(true);
         if (browser!=null) browser.onResume();
         if (player!=null && resumePlay) player.play();
-        else if (!stream.isEmpty() && player==null) { if (external) openExternal(); else playNative(); }
+        else if (player==null && !stream.isEmpty()) playResolvedStream();
     }
     @Override protected void onSaveInstanceState(Bundle b) { super.onSaveInstanceState(b); b.putInt("source",selected); record(); }
     @Override protected void onDestroy() {
