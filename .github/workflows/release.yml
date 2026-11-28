@@ -29,6 +29,7 @@ jobs:
         env:
           SEANS_KEYSTORE: ${{ runner.temp }}/seans-release.jks
           SEANS_KEYSTORE_PASSWORD: ${{ secrets.SEANS_KEYSTORE_PASSWORD }}
+          SEANS_CATALOG_URL: ${{ vars.SEANS_CATALOG_URL }}
         run: |
           chmod +x gradlew
           ./gradlew -PparallelInstall :app:assembleRelease

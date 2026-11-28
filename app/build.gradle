@@ -8,6 +8,10 @@ def signing = new Properties()
 def signingFile = rootProject.file('keystore.properties')
 if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
 def signingValue = { String key, String env -> signing.getProperty(key) ?: System.getenv(env) }
+def catalogUrl = providers.gradleProperty('catalogUrl').orElse(providers.environmentVariable('SEANS_CATALOG_URL')).getOrElse('').replaceAll('/+$', '')
+if (catalogUrl && !(catalogUrl ==~ /https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?(?:\/[A-Za-z0-9._-]+)*/)) {
+    throw new GradleException('SEANS_CATALOG_URL must be an HTTPS base URL')
+}
 
 android {
     namespace 'app.seans.cinema'
@@ -18,10 +22,11 @@ android {
             applicationIdSuffix '.home'
         }
         resValue 'string', 'app_name', providers.gradleProperty('parallelInstall').isPresent() ? 'Сеанс Кино' : 'Сеанс'
+        resValue 'string', 'catalog_url', catalogUrl
         minSdk 26
         targetSdk 35
-        versionCode 13
-        versionName '2.0'
+        versionCode 14
+        versionName '2.0.1'
     }
     signingConfigs {
         release {

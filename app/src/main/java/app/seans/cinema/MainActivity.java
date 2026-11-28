@@ -29,6 +29,8 @@ public class MainActivity extends Activity {
     private static final String BASE = "https://appassets.androidplatform.net/";
     private static final int TORRSERVE_INSTALL_PERMISSION = 46;
     private static final Set<String> FILES = new java.util.HashSet<>(java.util.Arrays.asList("index.html","screen.css","material.js","sources.js","playback.js","search.js","feed.js","cinema.js"));
+    private static final Set<String> TRAILER_HOSTS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "rutube.ru","www.rutube.ru","vk.com","vkvideo.ru","www.youtube.com","youtube.com","youtu.be"));
     private final ExecutorService network = Executors.newFixedThreadPool(8);
     private final ExecutorService details = Executors.newFixedThreadPool(2);
     private WebView web;
@@ -186,6 +188,26 @@ public class MainActivity extends Activity {
             String origin = Catalog.origin(raw);
             getPreferences(0).edit().putString("mirror",origin).apply();
         }
+        @JavascriptInterface public boolean metadataEnabled() {
+            return !getPreferences(0).getString("poiskkinoKey","").isEmpty();
+        }
+        @JavascriptInterface public boolean tmdbEnabled() { return !getString(R.string.catalog_url).isEmpty(); }
+        @JavascriptInterface public void setMetadataKey(String key) {
+            if (key.isEmpty() || key.matches("[A-Za-z0-9_-]{8,256}"))
+                getPreferences(0).edit().putString("poiskkinoKey",key).apply();
+        }
+        @JavascriptInterface public void openTrailer(String url) {
+            Uri uri=Uri.parse(url);
+            String host=uri.getHost();
+            if (!"https".equals(uri.getScheme()) || uri.getUserInfo()!=null || host==null ||
+                    !TRAILER_HOSTS.contains(host)) return;
+            runOnUiThread(()->{
+                try { startActivity(new Intent(Intent.ACTION_VIEW,uri).addCategory(Intent.CATEGORY_BROWSABLE)); }
+                catch (ActivityNotFoundException e) {
+                    android.widget.Toast.makeText(MainActivity.this,"Нет приложения для открытия трейлера",android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
         @JavascriptInterface public void request(int id,String method,String data) {
             (method.equals("detail") || method.equals("kinopoisk") ? details : network).execute(() -> {
                 JSONObject result = null;
@@ -194,6 +216,27 @@ public class MainActivity extends Activity {
                     JSONObject a = new JSONObject(data);
                     if (method.equals("detail")) result = Catalog.details(a.getString("url"));
                     else if (method.equals("kinopoisk")) result = Rukino.lookup(a.getString("path"));
+                    else if (method.equals("tmdbNew") || method.equals("tmdbTitle")) {
+                        String base=getString(R.string.catalog_url);
+                        String type=a.optString("type"), movieId=a.optString("id");
+                        if (base.isEmpty()) throw new IllegalStateException("Каталог TMDB не подключён.");
+                        if (method.equals("tmdbTitle") && !(("movie".equals(type) || "tv".equals(type)) && movieId.matches("[1-9][0-9]{0,8}")))
+                            throw new IllegalArgumentException("Неверный ID фильма.");
+                        String path=method.equals("tmdbNew")?"/new":"/title/"+type+"/"+movieId;
+                        result=new JSONObject(org.jsoup.Jsoup.connect(base+"/v1"+path).ignoreContentType(true)
+                                .followRedirects(false).timeout(10000).maxBodySize(500_000).execute().body());
+                    }
+                    else if (method.equals("metadata")) {
+                        String key=getPreferences(0).getString("poiskkinoKey","");
+                        int movieId=a.getInt("id");
+                        if (key.isEmpty() || movieId<=0) result=new JSONObject();
+                        else {
+                            org.jsoup.Connection.Response response=org.jsoup.Jsoup.connect("https://api.poiskkino.dev/v1.5/movie/"+movieId)
+                                    .header("X-API-KEY",key).ignoreContentType(true).ignoreHttpErrors(true).followRedirects(false)
+                                    .timeout(8000).maxBodySize(1_000_000).execute();
+                            result=response.statusCode()==200?new JSONObject(response.body()):new JSONObject();
+                        }
+                    }
                     else if (method.equals("collaps")) result = PlaybackSources.collaps(a);
                     else if (method.equals("vibix")) result = PlaybackSources.vibix(a);
                     else if (method.equals("torrents")) result = PlaybackSources.torrents(a);

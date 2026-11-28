@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useId} from 'react';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import createCache from '@emotion/cache';
@@ -20,7 +20,7 @@ import TuneIcon from '@mui/icons-material/TuneRounded';
 import TvIcon from '@mui/icons-material/TvRounded';
 import PhoneIcon from '@mui/icons-material/SmartphoneRounded';
 import PlayIcon from '@mui/icons-material/PlayArrowRounded';
-import MenuIcon from '@mui/icons-material/MenuRounded';
+import ExpandLessIcon from '@mui/icons-material/ExpandLessRounded';
 import HomeIcon from '@mui/icons-material/HomeOutlined';
 import SeriesIcon from '@mui/icons-material/LiveTvOutlined';
 import ListIcon from '@mui/icons-material/ViewModuleOutlined';
@@ -67,37 +67,31 @@ const menu=[['home','Главная',HomeIcon],['catalog','Каталог',ListI
     ['continue','Досмотреть',ResumeIcon],['search','Поиск',SearchIcon],['library','Избранное',LibraryIcon],['settings','Настройки',SettingsIcon]];
 // The logo: a ticket-shaped play button and the name beside it.
 function Logo(){
+    const fill=useId();
     return <div className="brand" aria-label="Сеанс">
         <svg className="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
-            <defs><linearGradient id="logoFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe45c"/><stop offset="1" stopColor="#ffb020"/></linearGradient></defs>
-            <path fill="url(#logoFill)" d="M8 3h16a5 5 0 0 1 5 5v5a3 3 0 0 0 0 6v5a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5v-5a3 3 0 0 0 0-6V8a5 5 0 0 1 5-5z"/>
+            <defs><linearGradient id={fill} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe45c"/><stop offset="1" stopColor="#ffb020"/></linearGradient></defs>
+            <path fill={'url(#'+fill+')'} d="M8 3h16a5 5 0 0 1 5 5v5a3 3 0 0 0 0 6v5a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5v-5a3 3 0 0 0 0-6V8a5 5 0 0 1 5-5z"/>
             <path fill="#17191a" d="M13 10.5v11a1 1 0 0 0 1.5.86l9-5.5a1 1 0 0 0 0-1.72l-9-5.5A1 1 0 0 0 13 10.5z"/>
         </svg>
         <span className="logo-text">Сеанс</span>
     </div>;
 }
-function Clock(){
-    const [now,setNow]=useState(new Date());
-    useEffect(()=>{const t=setInterval(()=>setNow(new Date()),15000);return ()=>clearInterval(t);},[]);
-    return <span className="clock"><strong>{now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</strong>
-        <small>{now.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}<br/>{now.toLocaleDateString('ru-RU',{weekday:'long'})}</small></span>;
-}
-function Chrome({active,section,title,menuOpen,tv}){
+function Chrome({active,section,menuOpen,tv}){
     return <>
-        <header className="topbar">
-            {!tv && <IconButton id="menu-toggle" className="menu-button" aria-label="Меню" aria-expanded={menuOpen}
-                aria-controls="sidemenu" onClick={()=>window.toggleMenu()}><MenuIcon/></IconButton>}
+        {!tv && <header className="topbar">
             <Logo/>
-            {title && <span className="topbar-title">{title}</span>}
-            <span className="spacer"/>
-            {tv && <Clock/>}
-        </header>
+        </header>}
         {!tv && <nav id="tabs" aria-label="Разделы">{sections.map(([id,label,Icon])=>
             <IconButton key={id} data-tab={id} className={active===id?'on':''} aria-current={active===id?'page':undefined}
-                aria-label={label} onClick={()=>window.openSection(id)}><Icon/></IconButton>)}</nav>}
+                aria-label={id==='home'?'Главная и меню':label} aria-expanded={id==='home'?menuOpen:undefined}
+                aria-controls={id==='home'?'sidemenu':undefined}
+                onClick={()=>id==='home'?window.homeNavigation():window.openSection(id)}>
+                <Icon/>{id==='home' && <ExpandLessIcon className="home-chevron" aria-hidden="true"/>}
+            </IconButton>)}</nav>}
         <div id="menu-scrim" className={menuOpen?'open':''} onClick={()=>window.closeMenu()} aria-hidden="true"/>
         <aside id="sidemenu" className={menuOpen?'open':''} aria-label="Разделы" inert={!tv && !menuOpen}>
-            <div className="menu-head"><Logo/></div>
+            {tv && <div className="menu-head"><Logo/></div>}
             {menu.map(([id,label,Icon])=><Button key={id} data-menu={id} className={section===id?'on':''} startIcon={<Icon/>}
                 aria-label={label} aria-current={section===id?'page':undefined} tabIndex={tv && !menuOpen?-1:undefined}
                 onClick={()=>tv && !menuOpen?window.toggleMenu():window.openSection(id)}><span className="drawer-label">{label}</span></Button>)}
@@ -105,27 +99,40 @@ function Chrome({active,section,title,menuOpen,tv}){
     </>;
 }
 const chrome=createRoot(document.getElementById('chrome'));
-const chromeState={active:'home',section:'home',title:'',menuOpen:false};
+const chromeState={active:'home',section:'home',menuOpen:false};
 function drawChrome(change){Object.assign(chromeState,change);flushSync(()=>chrome.render(themed(<Chrome {...chromeState}/>)));}
-function selectTab(tab,section=tab,title='',tv=false){drawChrome({active:tab,section,title,tv});}
+function selectTab(tab,section=tab,tv=false){drawChrome({active:tab,section,tv});}
 selectTab('home');
 const surface=createRoot(document.getElementById('veil'));
 flushSync(()=>surface.render(themed(<Paper component="section" id="modal" className="modal" role="dialog"
     aria-modal="true" aria-labelledby="modalTitle" elevation={8}/>)));
 
-function PosterGrid({entries}){
-    return entries.map(({item,title,meta,focusId,open,progress})=>
+function PosterImage({url}){
+    const [state,setState]=useState('loading');
+    return <>
+        {state==='loading' && <span className="sk-art poster-loading" aria-hidden="true"/>}
+        {state!=='failed' && <img className={state==='loading'?'poster-awaiting':''} src={url} alt="" loading="lazy"
+            onLoad={()=>setState('ready')} onError={()=>setState('failed')}/>}
+    </>;
+}
+function PosterGrid({entries,placeholders=0}){
+    return <>
+        {entries.map(({item,title,meta,focusId,open,progress})=>
         <CardActionArea key={focusId||item.url} className="card" data-url={item.url} data-focus-id={focusId}
             onClick={e=>open(e.currentTarget)}>
             <span className="art">
                 <span className="art-fallback" aria-hidden="true">{(title||item.title||'').slice(0,1)}</span>
-                {item.poster?.startsWith('https://') && <img src={item.poster} alt="" loading="lazy" onError={e=>{e.currentTarget.hidden=true;}}/>}
+                {item.poster?.startsWith('https://') && <PosterImage key={item.poster} url={item.poster}/>}
                 {item.kind==='Сериал' && <span className="tag-tv">TV</span>}
                 {item.score && <span className="score">{item.score}</span>}
                 {progress>0 && <span className="progress"><i style={{width:Math.min(100,Math.round(progress*100))+'%'}}/></span>}
             </span>
             <strong>{title||item.title}</strong><small>{meta}</small>
-        </CardActionArea>);
+        </CardActionArea>)}
+        {Array.from({length:placeholders},(_,i)=><div key={'placeholder-'+i} aria-hidden="true">
+            <div className="sk-art"/><div className="sk-line"/><div className="sk-line short"/>
+        </div>)}
+    </>;
 }
 function ModeOptions({choose}){
     return [['tv','Телевизор','Управление пультом',TvIcon],['mobile','Телефон','Сенсорное управление',PhoneIcon]].map(([id,label,hint,Icon])=>
@@ -190,8 +197,8 @@ function SearchForm({tv,draft,initial,open,fields,onDraft,onSubmit,onToggle,onCh
 }
 window.SeansUI={
     selectTab, menu:open=>drawChrome({menuOpen:open}),
-    grid:entries=>region(<PosterGrid entries={entries}/>,'grid'),
-    updateGrid:(host,entries)=>updateRegion(host,<PosterGrid entries={entries}/>),
+    grid:(entries,placeholders)=>region(<PosterGrid entries={entries} placeholders={placeholders}/>,'grid'),
+    updateGrid:(host,entries,placeholders)=>updateRegion(host,<PosterGrid entries={entries} placeholders={placeholders}/>),
     modes:choose=>region(<ModeOptions choose={choose}/>,'mui-modes'),
     playActions:(label,external,play)=>region(<>
         <Button variant="contained" className="primary" startIcon={<PlayIcon/>} onClick={()=>play(false)}>{label}</Button>
